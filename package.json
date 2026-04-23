@@ -1,0 +1,15 @@
+{
+  "name": "jobfinder-beta-bugs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lightweight bug-report inbox for JobFinder.guru beta users.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
