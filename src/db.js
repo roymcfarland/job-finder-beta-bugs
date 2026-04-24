@@ -27,14 +27,18 @@ export function getPool(config) {
   if (!globalStore.pool || globalStore.connectionUrl !== connectionUrl) {
     globalStore.connectionUrl = connectionUrl;
     globalStore.schemaReady = null;
-    globalStore.pool = new Pool({
-      connectionString: connectionUrl,
-      max: 5,
-      ssl: shouldUseSsl(connectionUrl) ? { rejectUnauthorized: false } : undefined,
-    });
+    globalStore.pool = new Pool(createPoolOptions(connectionUrl));
   }
 
   return globalStore.pool;
+}
+
+export function createPoolOptions(connectionUrl) {
+  return {
+    connectionString: normalizeConnectionUrl(connectionUrl),
+    max: 5,
+    ssl: shouldUseSsl(connectionUrl) ? { rejectUnauthorized: false } : undefined,
+  };
 }
 
 export async function ensureDatabase(config) {
@@ -177,5 +181,23 @@ function shouldUseSsl(connectionUrl) {
     return !["localhost", "127.0.0.1"].includes(parsed.hostname);
   } catch {
     return true;
+  }
+}
+
+function normalizeConnectionUrl(connectionUrl) {
+  if (!shouldUseSsl(connectionUrl)) {
+    return connectionUrl;
+  }
+
+  try {
+    const parsed = new URL(connectionUrl);
+
+    // When pg sees sslmode=require in the URL, it can override the explicit
+    // TLS options we pass and reject pooled provider certificates.
+    parsed.searchParams.delete("sslmode");
+
+    return parsed.toString();
+  } catch {
+    return connectionUrl;
   }
 }
