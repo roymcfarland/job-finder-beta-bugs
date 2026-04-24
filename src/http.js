@@ -129,6 +129,17 @@ export function redirectResponse(location, status = 302, headers = {}) {
   };
 }
 
+export function methodNotAllowedResponse(headers, allow) {
+  return jsonResponse(
+    405,
+    { error: "Method not allowed." },
+    {
+      ...headers,
+      allow,
+    },
+  );
+}
+
 export function buildApiHeaders(allowedOrigin, requestOrigin) {
   const corsHeaders =
     allowedOrigin && requestOrigin === allowedOrigin
@@ -162,7 +173,12 @@ export function parseCookies(cookieHeader = "") {
 
     const name = trimmed.slice(0, separatorIndex).trim();
     const value = trimmed.slice(separatorIndex + 1).trim();
-    cookies[name] = decodeURIComponent(value);
+
+    try {
+      cookies[name] = decodeURIComponent(value);
+    } catch {
+      continue;
+    }
   }
 
   return cookies;

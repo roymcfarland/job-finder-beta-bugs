@@ -1,8 +1,7 @@
-import crypto from "node:crypto";
-
 import { buildBugReportSubmission } from "./bugReportSchema.js";
 import { getConfig } from "./config.js";
 import { DatabaseNotConfiguredError, query } from "./db.js";
+import { getErrorContext } from "./logger.js";
 
 export class BugReportConfigurationError extends Error {
   constructor(message) {
@@ -26,7 +25,7 @@ export function createBugReportService(options = {}) {
 
       report.reporter.email = user.email;
 
-      const reportId = crypto.randomUUID();
+      const reportId = report.meta.submissionId;
 
       try {
         await query(
@@ -90,7 +89,7 @@ export function createBugReportService(options = {}) {
 
           notificationMode = delivery.mode === "disabled" ? "stored-only" : delivery.mode;
         } catch (error) {
-          logger.warn("Bug report notification failed", error);
+          logWarning(logger, "Bug report notification failed.", error);
         }
       }
 
@@ -134,4 +133,11 @@ export function createBugReportService(options = {}) {
       }));
     },
   };
+}
+
+function logWarning(logger, message, error) {
+  const log = logger.warn ?? logger.log;
+  if (typeof log === "function") {
+    log.call(logger, message, getErrorContext(error));
+  }
 }

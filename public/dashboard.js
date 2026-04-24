@@ -1,3 +1,5 @@
+import { element, formatTimestamp, variant } from "/dom.js";
+
 const form = document.querySelector("#bug-report-form");
 const statusPanel = document.querySelector("#form-status");
 const submitButton = document.querySelector("#submit-button");
@@ -7,8 +9,11 @@ const sessionEmail = document.querySelector("#session-email");
 const recentReports = document.querySelector("#recent-reports");
 const adminLink = document.querySelector("#admin-link");
 const storageKey = "jobfinder-beta-bugs:report-draft:v2";
+const severityLevels = ["low", "medium", "high", "blocking"];
 
-initialize();
+initialize().catch(() => {
+  showStatus("Unable to load the dashboard. Refresh and try again.", "error");
+});
 
 form.addEventListener("submit", handleSubmit);
 form.addEventListener("input", persistDraft);
@@ -86,7 +91,7 @@ async function handleSubmit(event) {
       return;
     }
 
-    localStorage.removeItem(storageKey);
+    clearDraft();
     form.reset();
     setStartedAt();
     showStatus(
@@ -135,35 +140,40 @@ function renderReports(reports) {
   }
 
   recentReports.className = "report-list";
-  recentReports.innerHTML = reports
-    .map(
-      (report) => `
-        <article class="report-item">
-          <div class="report-item__state ${
-            report.isResolved ? "report-item__state--resolved" : "report-item__state--open"
-          }">
-            ${report.isResolved ? "Resolved" : "Unresolved"}
-          </div>
-          <div class="report-item__head">
-            <strong>${escapeHtml(report.summary)}</strong>
-            <span class="report-badge report-badge--${escapeHtml(report.severity)}">${escapeHtml(
-              report.severity,
-            )}</span>
-          </div>
-          <p>${escapeHtml(report.category)} • ${formatTimestamp(report.createdAt)}</p>
-          <small>${escapeHtml(report.id)}</small>
-        </article>
-      `,
-    )
-    .join("");
+  recentReports.replaceChildren(...reports.map(createReportItem));
+}
 
-  for (const [index, report] of reports.entries()) {
-    if (!report.isResolved) {
-      continue;
-    }
+function createReportItem(report) {
+  const severity = variant(report.severity, severityLevels, "medium");
+  const state = report.isResolved ? "resolved" : "open";
+  const meta = element("p");
+  meta.append(
+    String(report.category || "uncategorized"),
+    " • ",
+    formatTimestamp(report.createdAt),
+  );
 
-    recentReports.children[index]?.classList.add("report-item--resolved");
-  }
+  return element(
+    "article",
+    {
+      className: `report-item${report.isResolved ? " report-item--resolved" : ""}`,
+    },
+    [
+      element("div", {
+        className: `report-item__state report-item__state--${state}`,
+        text: report.isResolved ? "Resolved" : "Unresolved",
+      }),
+      element("div", { className: "report-item__head" }, [
+        element("strong", { text: report.summary || "Untitled report" }),
+        element("span", {
+          className: `report-badge report-badge--${severity}`,
+          text: report.severity || "unknown",
+        }),
+      ]),
+      meta,
+      element("small", { text: report.id || "Unknown report id" }),
+    ],
+  );
 }
 
 function setStartedAt() {
@@ -191,11 +201,22 @@ function persistDraft() {
     extraDetails: getFieldValue("extraDetails"),
   };
 
-  localStorage.setItem(storageKey, JSON.stringify(draft));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(draft));
+  } catch {
+    // Draft persistence is helpful, but it should never block form use.
+  }
 }
 
 function restoreDraft() {
-  const rawDraft = localStorage.getItem(storageKey);
+  let rawDraft;
+
+  try {
+    rawDraft = localStorage.getItem(storageKey);
+  } catch {
+    return;
+  }
+
   if (!rawDraft) {
     return;
   }
@@ -210,7 +231,15 @@ function restoreDraft() {
       }
     }
   } catch {
+    clearDraft();
+  }
+}
+
+function clearDraft() {
+  try {
     localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage cleanup failures.
   }
 }
 
@@ -261,23 +290,4 @@ function getField(name) {
 
 function getFieldValue(name) {
   return getField(name)?.value ?? "";
-}
-
-function formatTimestamp(value) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "Unknown time"
-    : parsed.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }

@@ -1,7 +1,14 @@
+import { getSessionResult } from "./apiSession.js";
 import { ValidationError } from "./bugReportSchema.js";
 import { BugReportConfigurationError } from "./bugReportService.js";
 import { getConfig } from "./config.js";
-import { buildApiHeaders, jsonResponse, parseJsonObject } from "./http.js";
+import {
+  buildApiHeaders,
+  jsonResponse,
+  methodNotAllowedResponse,
+  parseJsonObject,
+} from "./http.js";
+import { getErrorContext } from "./logger.js";
 import { createRateLimitStore } from "./rateLimitStore.js";
 
 export function createBugReportApi(options = {}) {
@@ -28,21 +35,23 @@ export function createBugReportApi(options = {}) {
         };
       }
 
-      const session = await authService.getSessionFromCookie(request.cookieHeader);
+      const sessionResult = await getSessionResult({
+        authService,
+        cookieHeader: request.cookieHeader,
+        headers,
+      });
+      if (sessionResult.response) {
+        return sessionResult.response;
+      }
+
+      const session = sessionResult.session;
       if (!session?.user) {
         return jsonResponse(401, { error: "Unauthorized." }, headers);
       }
 
       if (request.pathname === "/api/reports") {
         if (request.method !== "GET") {
-          return jsonResponse(
-            405,
-            { error: "Method not allowed." },
-            {
-              ...headers,
-              allow: "GET, OPTIONS",
-            },
-          );
+          return methodNotAllowedResponse(headers, "GET, OPTIONS");
         }
 
         try {
@@ -62,14 +71,7 @@ export function createBugReportApi(options = {}) {
       }
 
       if (request.method !== "POST") {
-        return jsonResponse(
-          405,
-          { error: "Method not allowed." },
-          {
-            ...headers,
-            allow: "POST, OPTIONS",
-          },
-        );
+        return methodNotAllowedResponse(headers, "POST, OPTIONS");
       }
 
       let payload;
@@ -124,7 +126,7 @@ export function createBugReportApi(options = {}) {
           return jsonResponse(503, { error: error.message }, headers);
         }
 
-        logger.error("Bug report submission failed", error);
+        logError(logger, "Bug report submission failed.", error);
         return jsonResponse(
           500,
           { error: "Something went wrong while saving this report." },
@@ -133,4 +135,11 @@ export function createBugReportApi(options = {}) {
       }
     },
   };
+}
+
+function logError(logger, message, error) {
+  const log = logger.error ?? logger.log;
+  if (typeof log === "function") {
+    log.call(logger, message, getErrorContext(error));
+  }
 }

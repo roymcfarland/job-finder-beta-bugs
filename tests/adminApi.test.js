@@ -157,3 +157,45 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
   const body = JSON.parse(result.body);
   assert.equal(body.user.isDisabled, true);
 });
+
+test("POST /api/admin/users/status rejects non-boolean action values", async () => {
+  let updateCalled = false;
+  const api = createAdminApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    authService: {
+      async getSessionFromCookie() {
+        return createAdminSession();
+      },
+    },
+    adminService: {
+      async getDashboardData() {
+        return {};
+      },
+      async listComments() {
+        return [];
+      },
+      async setCommentResolved() {
+        return {};
+      },
+      async setUserDisabled() {
+        updateCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/admin/users/status",
+    method: "POST",
+    origin: undefined,
+    cookieHeader: "jobfinder_session=session_token",
+    rawBody: JSON.stringify({
+      userId: "user_2",
+      disabled: "false",
+    }),
+    searchParams: new URLSearchParams(),
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(updateCalled, false);
+});

@@ -5,10 +5,12 @@ import {
   InvalidCredentialsError,
   InvalidResetTokenError,
 } from "./authService.js";
+import { getSessionResult } from "./apiSession.js";
 import { EmailDeliveryUnavailableError } from "./notifications.js";
 import {
   buildApiHeaders,
   jsonResponse,
+  methodNotAllowedResponse,
   parseJsonObject,
   serializeCookie,
 } from "./http.js";
@@ -30,10 +32,18 @@ export function createAuthApi(options) {
 
       if (request.pathname === "/api/auth/session") {
         if (request.method !== "GET") {
-          return methodNotAllowed(headers, "GET, OPTIONS");
+          return methodNotAllowedResponse(headers, "GET, OPTIONS");
         }
 
-        const session = await authService.getSessionFromCookie(request.cookieHeader);
+        const { response, session } = await getSessionResult({
+          authService,
+          cookieHeader: request.cookieHeader,
+          headers,
+        });
+        if (response) {
+          return response;
+        }
+
         if (!session?.user) {
           return jsonResponse(401, { error: "Unauthorized." }, headers);
         }
@@ -49,10 +59,18 @@ export function createAuthApi(options) {
 
       if (request.pathname === "/api/auth/logout") {
         if (request.method !== "POST") {
-          return methodNotAllowed(headers, "POST, OPTIONS");
+          return methodNotAllowedResponse(headers, "POST, OPTIONS");
         }
 
-        const session = await authService.getSessionFromCookie(request.cookieHeader);
+        const { response, session } = await getSessionResult({
+          authService,
+          cookieHeader: request.cookieHeader,
+          headers,
+        });
+        if (response) {
+          return response;
+        }
+
         if (session?.token) {
           await authService.logout(session.token);
         }
@@ -68,7 +86,7 @@ export function createAuthApi(options) {
       }
 
       if (request.method !== "POST") {
-        return methodNotAllowed(headers, "POST, OPTIONS");
+        return methodNotAllowedResponse(headers, "POST, OPTIONS");
       }
 
       const limitResult = rateLimiter.consume(request.ip || "unknown", Date.now());
@@ -315,17 +333,6 @@ async function handleReset({ authService, config, headers, payload, request }) {
 
     throw error;
   }
-}
-
-function methodNotAllowed(headers, allow) {
-  return jsonResponse(
-    405,
-    { error: "Method not allowed." },
-    {
-      ...headers,
-      allow,
-    },
-  );
 }
 
 function buildSessionCookie(config, result) {

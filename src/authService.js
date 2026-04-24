@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { getConfig } from "./config.js";
 import { DatabaseNotConfiguredError, query, withTransaction } from "./db.js";
 import { parseCookies } from "./http.js";
+import { getErrorContext } from "./logger.js";
 import { EmailDeliveryUnavailableError } from "./notifications.js";
 import { hashPassword, validatePassword, verifyPassword } from "./passwords.js";
 import { createOpaqueToken, hashToken } from "./tokens.js";
@@ -46,6 +47,7 @@ export function createAuthService(options = {}) {
   const config = options.config ?? getConfig();
   const now = options.now ?? (() => new Date());
   const notifications = options.notifications;
+  const logger = options.logger ?? console;
 
   return {
     normalizeEmail,
@@ -159,20 +161,28 @@ export function createAuthService(options = {}) {
         throw error;
       }
 
-      if (user?.disabled_at) {
-        throw new AccountDisabledError();
-      }
-
       if (!user || !(await verifyPassword(password, user.password_hash))) {
         throw new InvalidCredentialsError();
       }
 
-      user.role = await synchronizeAdminRole({
-        config,
-        userId: user.id,
-        email: user.email,
-        currentRole: user.role,
-      });
+      if (user.disabled_at) {
+        throw new AccountDisabledError();
+      }
+
+      try {
+        user.role = await synchronizeAdminRole({
+          config,
+          userId: user.id,
+          email: user.email,
+          currentRole: user.role,
+        });
+      } catch (error) {
+        if (error instanceof DatabaseNotConfiguredError) {
+          throw new AuthConfigurationError(error.message);
+        }
+
+        throw error;
+      }
 
       const session = createSessionRecord(now(), config.session.ttlMs, ipAddress, userAgent);
 
@@ -319,7 +329,7 @@ export function createAuthService(options = {}) {
         const result = await query(
           config,
           `
-            SELECT id, email
+            SELECT id, email, disabled_at
             FROM users
             WHERE email = $1
             LIMIT 1
@@ -336,7 +346,7 @@ export function createAuthService(options = {}) {
         throw error;
       }
 
-      if (!user) {
+      if (!user || user.disabled_at) {
         return { delivered: false };
       }
 
@@ -344,14 +354,22 @@ export function createAuthService(options = {}) {
       const tokenId = crypto.randomUUID();
       const expiresAt = new Date(now().getTime() + config.passwordReset.ttlMs);
 
-      await query(
-        config,
-        `
-          INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
-          VALUES ($1, $2, $3, $4)
-        `,
-        [tokenId, user.id, hashToken(token), expiresAt],
-      );
+      try {
+        await query(
+          config,
+          `
+            INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3, $4)
+          `,
+          [tokenId, user.id, hashToken(token), expiresAt],
+        );
+      } catch (error) {
+        if (error instanceof DatabaseNotConfiguredError) {
+          throw new AuthConfigurationError(error.message);
+        }
+
+        throw error;
+      }
 
       const resetUrl = `${config.baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
@@ -366,14 +384,18 @@ export function createAuthService(options = {}) {
           deliveryMode: delivery.mode,
         };
       } catch (error) {
-        await query(
-          config,
-          `
-            DELETE FROM password_reset_tokens
-            WHERE id = $1
-          `,
-          [tokenId],
-        );
+        try {
+          await query(
+            config,
+            `
+              DELETE FROM password_reset_tokens
+              WHERE id = $1
+            `,
+            [tokenId],
+          );
+        } catch (cleanupError) {
+          logWarning(logger, "Password reset token cleanup failed.", cleanupError);
+        }
 
         if (error instanceof EmailDeliveryUnavailableError) {
           throw error;
@@ -392,11 +414,13 @@ export function createAuthService(options = {}) {
         await withTransaction(config, async (client) => {
           const tokenResult = await client.query(
             `
-              SELECT id, user_id
+              SELECT password_reset_tokens.id, password_reset_tokens.user_id
               FROM password_reset_tokens
+              INNER JOIN users ON users.id = password_reset_tokens.user_id
               WHERE token_hash = $1
                 AND used_at IS NULL
                 AND expires_at > NOW()
+                AND users.disabled_at IS NULL
               LIMIT 1
             `,
             [tokenHash],
@@ -450,7 +474,7 @@ export function createAuthService(options = {}) {
 
           const userResult = await client.query(
             `
-              SELECT id, email
+              SELECT id, email, role
               FROM users
               WHERE id = $1
               LIMIT 1
@@ -458,7 +482,13 @@ export function createAuthService(options = {}) {
             [resetToken.user_id],
           );
 
-          session.user = userResult.rows[0];
+          const user = userResult.rows[0];
+          session.user = {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            isAdmin: user.role === "admin",
+          };
         });
       } catch (error) {
         if (error instanceof DatabaseNotConfiguredError) {
@@ -535,4 +565,11 @@ function createSessionRecord(currentTime, ttlMs, ipAddress, userAgent) {
     ipAddress: String(ipAddress ?? "").slice(0, 120),
     userAgent: String(userAgent ?? "").slice(0, 400),
   };
+}
+
+function logWarning(logger, message, error) {
+  const log = logger.warn ?? logger.log;
+  if (typeof log === "function") {
+    log.call(logger, message, getErrorContext(error));
+  }
 }

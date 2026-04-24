@@ -20,6 +20,7 @@ import {
   redirectResponse,
   sendNodeResponse,
 } from "./http.js";
+import { getErrorContext } from "./logger.js";
 import { createNotificationService } from "./notifications.js";
 import { createRateLimitStore } from "./rateLimitStore.js";
 
@@ -30,6 +31,7 @@ const templateCache = new Map();
 
 export function createApp(options = {}) {
   const config = options.config ?? getConfig();
+  const logger = options.logger ?? console;
   const notifications =
     options.notifications ?? createNotificationService(config, options);
   const authService =
@@ -94,6 +96,9 @@ export function createApp(options = {}) {
         sendNodeResponse(response, result);
       } catch (error) {
         const isLargeBody = error instanceof BodyTooLargeError;
+        if (!isLargeBody) {
+          logUnhandledRequestError(logger, request, error);
+        }
 
         sendNodeResponse(
           response,
@@ -271,10 +276,27 @@ async function serveStaticAsset(pathname, method) {
 }
 
 function resolveStaticFile(pathname) {
-  const normalizedPath = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
-  const candidate = path.join(publicDir, normalizedPath);
+  let decodedPath;
 
-  if (!candidate.startsWith(publicDir)) {
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+
+  if (decodedPath.includes("\0")) {
+    return null;
+  }
+
+  const relativePath = decodedPath.replace(/^[/\\]+/, "");
+  const candidate = path.resolve(publicDir, relativePath);
+  const relativeToPublic = path.relative(publicDir, candidate);
+
+  if (
+    relativeToPublic === "" ||
+    relativeToPublic.startsWith("..") ||
+    path.isAbsolute(relativeToPublic)
+  ) {
     return null;
   }
 
@@ -289,4 +311,25 @@ async function loadTemplate(fileName) {
   }
 
   return templateCache.get(fileName);
+}
+
+function logUnhandledRequestError(logger, request, error) {
+  const log = logger.error ?? logger.log;
+  if (typeof log !== "function") {
+    return;
+  }
+
+  log.call(logger, "Unhandled request error.", {
+    ...getErrorContext(error),
+    method: request.method ?? "GET",
+    pathname: getRequestPathname(request.url),
+  });
+}
+
+function getRequestPathname(rawUrl = "/") {
+  try {
+    return new URL(rawUrl, "http://127.0.0.1").pathname;
+  } catch {
+    return "/";
+  }
 }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createAuthApi } from "../src/authApi.js";
-import { AccountDisabledError } from "../src/authService.js";
+import { AccountDisabledError, AuthConfigurationError } from "../src/authService.js";
 import { getConfig } from "../src/config.js";
 
 function createAllowedRateLimiter() {
@@ -163,6 +163,52 @@ test("GET /api/auth/session returns unauthorized when no session exists", async 
   });
 
   assert.equal(result.status, 401);
+});
+
+test("GET /api/auth/session returns configuration errors cleanly", async () => {
+  const api = createAuthApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    rateLimiter: createAllowedRateLimiter(),
+    authService: {
+      validateRegistrationInput() {
+        return {};
+      },
+      validateLoginInput() {
+        return {};
+      },
+      validateResetInput() {
+        return { password: "" };
+      },
+      normalizeEmail(value) {
+        return String(value).toLowerCase();
+      },
+      async register() {
+        return null;
+      },
+      async login() {
+        return null;
+      },
+      async getSessionFromCookie() {
+        throw new AuthConfigurationError("Postgres is not configured.");
+      },
+      async logout() {},
+      async requestPasswordReset() {},
+      async resetPassword() {},
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/auth/session",
+    method: "GET",
+    origin: undefined,
+    ip: "127.0.0.1",
+    userAgent: "Mozilla/5.0",
+    cookieHeader: "",
+    rawBody: "",
+  });
+
+  assert.equal(result.status, 503);
+  assert.equal(JSON.parse(result.body).error, "Postgres is not configured.");
 });
 
 test("POST /api/auth/login returns a disabled-account error cleanly", async () => {

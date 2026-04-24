@@ -18,7 +18,10 @@ export function createNotificationService(config, options = {}) {
           );
         }
 
-        logger.log(`Password reset link for ${email}: ${resetUrl}`);
+        logInfo(logger, "Password reset link generated for local delivery.", {
+          email,
+          resetUrl,
+        });
         return { mode: "console" };
       }
 
@@ -63,10 +66,13 @@ export function createNotificationService(config, options = {}) {
       }
 
       if (config.environment !== "production") {
-        logger.log(
-          "Bug report notification:",
-          JSON.stringify({ reporterEmail, report }, null, 2),
-        );
+        logInfo(logger, "Bug report notification skipped; report stored locally.", {
+          reporterEmail,
+          submissionId: report.meta.submissionId,
+          category: report.report.category,
+          severity: report.report.severity,
+          summary: report.report.summary,
+        });
         return { mode: "console" };
       }
 
@@ -109,7 +115,9 @@ async function sendWebhookNotification(fetchImpl, emailConfig, payload) {
   });
 
   if (!response.ok) {
-    throw new Error(`Bug report webhook failed with status ${response.status}.`);
+    throw new EmailDeliveryUnavailableError(
+      `Bug report webhook failed with status ${response.status}.`,
+    );
   }
 }
 
@@ -167,5 +175,12 @@ function buildBugReportEmail({ from, to, reporterEmail, report }) {
 function ensureFetch(fetchImpl) {
   if (typeof fetchImpl !== "function") {
     throw new EmailDeliveryUnavailableError("Global fetch is unavailable.");
+  }
+}
+
+function logInfo(logger, message, context) {
+  const log = logger.info ?? logger.log;
+  if (typeof log === "function") {
+    log.call(logger, message, context);
   }
 }

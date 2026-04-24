@@ -4,7 +4,13 @@ import {
   AdminNotFoundError,
   AdminPermissionError,
 } from "./adminService.js";
-import { buildApiHeaders, jsonResponse, parseJsonObject } from "./http.js";
+import { getSessionResult } from "./apiSession.js";
+import {
+  buildApiHeaders,
+  jsonResponse,
+  methodNotAllowedResponse,
+  parseJsonObject,
+} from "./http.js";
 
 export function createAdminApi(options) {
   const { config, authService, adminService } = options;
@@ -21,7 +27,16 @@ export function createAdminApi(options) {
         };
       }
 
-      const session = await authService.getSessionFromCookie(request.cookieHeader);
+      const sessionResult = await getSessionResult({
+        authService,
+        cookieHeader: request.cookieHeader,
+        headers,
+      });
+      if (sessionResult.response) {
+        return sessionResult.response;
+      }
+
+      const session = sessionResult.session;
       if (!session?.user) {
         return jsonResponse(401, { error: "Unauthorized." }, headers);
       }
@@ -33,7 +48,7 @@ export function createAdminApi(options) {
       try {
         if (request.pathname === "/api/admin/dashboard") {
           if (request.method !== "GET") {
-            return methodNotAllowed(headers);
+            return methodNotAllowedResponse(headers, "GET, OPTIONS");
           }
 
           const dashboard = await adminService.getDashboardData();
@@ -42,7 +57,7 @@ export function createAdminApi(options) {
 
         if (request.pathname === "/api/admin/comments") {
           if (request.method !== "GET") {
-            return methodNotAllowed(headers);
+            return methodNotAllowedResponse(headers, "GET, OPTIONS");
           }
 
           const comments = await adminService.listComments({
@@ -55,7 +70,7 @@ export function createAdminApi(options) {
 
         if (request.pathname === "/api/admin/comments/status") {
           if (request.method !== "POST") {
-            return methodNotAllowed(headers);
+            return methodNotAllowedResponse(headers, "POST, OPTIONS");
           }
 
           let payload;
@@ -65,10 +80,14 @@ export function createAdminApi(options) {
             return jsonResponse(400, { error: "Send a valid JSON payload." }, headers);
           }
 
+          const { id: commentId, flag: resolved } = parseActionPayload(payload, {
+            idField: "commentId",
+            flagField: "resolved",
+          });
           const comment = await adminService.setCommentResolved({
             adminUser: session.user,
-            commentId: String(payload.commentId || ""),
-            resolved: Boolean(payload.resolved),
+            commentId,
+            resolved,
           });
 
           return jsonResponse(200, { comment }, headers);
@@ -76,7 +95,7 @@ export function createAdminApi(options) {
 
         if (request.pathname === "/api/admin/users/status") {
           if (request.method !== "POST") {
-            return methodNotAllowed(headers);
+            return methodNotAllowedResponse(headers, "POST, OPTIONS");
           }
 
           let payload;
@@ -86,10 +105,14 @@ export function createAdminApi(options) {
             return jsonResponse(400, { error: "Send a valid JSON payload." }, headers);
           }
 
+          const { id: targetUserId, flag: disabled } = parseActionPayload(payload, {
+            idField: "userId",
+            flagField: "disabled",
+          });
           const user = await adminService.setUserDisabled({
             adminUser: session.user,
-            targetUserId: String(payload.userId || ""),
-            disabled: Boolean(payload.disabled),
+            targetUserId,
+            disabled,
           });
 
           return jsonResponse(200, { user }, headers);
@@ -119,13 +142,18 @@ export function createAdminApi(options) {
   };
 }
 
-function methodNotAllowed(headers) {
-  return jsonResponse(
-    405,
-    { error: "Method not allowed." },
-    {
-      ...headers,
-      allow: "GET, POST, OPTIONS",
-    },
-  );
+function parseActionPayload(payload, { idField, flagField }) {
+  const id = typeof payload[idField] === "string" ? payload[idField].trim() : "";
+  if (!id) {
+    throw new AdminActionError("Missing target id.");
+  }
+
+  if (typeof payload[flagField] !== "boolean") {
+    throw new AdminActionError("Invalid action value.");
+  }
+
+  return {
+    id,
+    flag: payload[flagField],
+  };
 }

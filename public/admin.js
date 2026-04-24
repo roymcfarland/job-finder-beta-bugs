@@ -1,3 +1,5 @@
+import { element, formatTimestamp, variant } from "/dom.js";
+
 const adminEmail = document.querySelector("#admin-email");
 const logoutButton = document.querySelector("#admin-logout-button");
 const usersContainer = document.querySelector("#admin-users");
@@ -15,8 +17,11 @@ const summaryNodes = {
 
 let currentSession = null;
 let users = [];
+const severityLevels = ["low", "medium", "high", "blocking"];
 
-initialize();
+initialize().catch(() => {
+  showStatus("Unable to load the admin dashboard. Refresh and try again.", "error");
+});
 
 logoutButton.addEventListener("click", handleLogout);
 filterUser.addEventListener("change", loadComments);
@@ -39,9 +44,13 @@ async function loadSession() {
     throw new Error("Unauthorized");
   }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
-  if (data.user.role !== "admin") {
+  if (!response.ok) {
+    throw new Error("Failed to load session.");
+  }
+
+  if (data.user?.role !== "admin") {
     window.location.assign("/dashboard");
     throw new Error("Forbidden");
   }
@@ -50,19 +59,20 @@ async function loadSession() {
 }
 
 async function loadDashboard() {
-  const response = await fetch("/api/admin/dashboard");
+  let response;
+  let data;
 
-  if (response.status === 401) {
-    window.location.assign("/");
+  try {
+    response = await fetch("/api/admin/dashboard");
+    data = await response.json().catch(() => ({}));
+  } catch {
+    showStatus("Network error while loading the admin dashboard.", "error");
     return;
   }
 
-  if (response.status === 403) {
-    window.location.assign("/dashboard");
+  if (redirectIfUnauthorized(response)) {
     return;
   }
-
-  const data = await response.json();
 
   if (!response.ok) {
     showStatus(data.error || "Failed to load admin dashboard.", "error");
@@ -84,8 +94,20 @@ async function loadComments() {
     searchParams.set("userId", filterUser.value);
   }
 
-  const response = await fetch(`/api/admin/comments?${searchParams.toString()}`);
-  const data = await response.json().catch(() => ({}));
+  let response;
+  let data;
+
+  try {
+    response = await fetch(`/api/admin/comments?${searchParams.toString()}`);
+    data = await response.json().catch(() => ({}));
+  } catch {
+    showStatus("Network error while loading comments.", "error");
+    return;
+  }
+
+  if (redirectIfUnauthorized(response)) {
+    return;
+  }
 
   if (!response.ok) {
     showStatus(data.error || "Failed to load comments.", "error");
@@ -106,7 +128,8 @@ async function handleLogout() {
 }
 
 async function handleUserAction(event) {
-  const button = event.target.closest("[data-user-id]");
+  const button =
+    event.target instanceof Element ? event.target.closest("[data-user-id]") : null;
   if (!button) {
     return;
   }
@@ -150,7 +173,8 @@ async function handleUserAction(event) {
 }
 
 async function handleCommentAction(event) {
-  const button = event.target.closest("[data-comment-id]");
+  const button =
+    event.target instanceof Element ? event.target.closest("[data-comment-id]") : null;
   if (!button) {
     return;
   }
@@ -205,50 +229,23 @@ function renderUsers(userList) {
   }
 
   usersContainer.className = "admin-user-list";
-  usersContainer.innerHTML = userList
-    .map((user) => {
-      const isCurrentAdmin = currentSession?.user?.id === user.id;
-
-      return `
-        <article class="admin-user-card ${user.isDisabled ? "admin-user-card--disabled" : ""}">
-          <div class="admin-user-card__head">
-            <div>
-              <strong>${escapeHtml(user.email)}</strong>
-              <p>
-                <span class="inline-badge">${escapeHtml(user.role)}</span>
-                <span class="inline-badge ${user.isDisabled ? "inline-badge--danger" : "inline-badge--success"}">
-                  ${user.isDisabled ? "disabled" : "active"}
-                </span>
-              </p>
-            </div>
-            <button
-              class="button-secondary button-secondary--small"
-              type="button"
-              data-user-id="${escapeHtml(user.id)}"
-              data-disabled="${String(!user.isDisabled)}"
-              ${isCurrentAdmin ? "disabled" : ""}
-            >
-              ${user.isDisabled ? "Enable" : "Disable"}
-            </button>
-          </div>
-          <small>
-            ${user.unresolvedCommentCount} unresolved / ${user.totalCommentCount} total comments
-          </small>
-        </article>
-      `;
-    })
-    .join("");
+  usersContainer.replaceChildren(...userList.map(createUserCard));
 }
 
 function renderUserFilter(userList) {
   const currentValue = filterUser.value;
 
-  filterUser.innerHTML = [
-    `<option value="">All users</option>`,
-    ...userList.map(
-      (user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.email)}</option>`,
+  filterUser.replaceChildren(
+    element("option", { text: "All users", attrs: { value: "" } }),
+    ...userList.map((user) =>
+      element("option", {
+        text: user.email,
+        attrs: {
+          value: user.id,
+        },
+      }),
     ),
-  ].join("");
+  );
 
   if (userList.some((user) => user.id === currentValue)) {
     filterUser.value = currentValue;
@@ -263,66 +260,7 @@ function renderComments(comments) {
   }
 
   commentsContainer.className = "admin-comment-list";
-  commentsContainer.innerHTML = comments
-    .map(
-      (comment) => `
-        <article class="comment-card ${comment.isResolved ? "comment-card--resolved" : ""}">
-          <div class="comment-card__head">
-            <div>
-              <div class="comment-card__meta">
-                <span class="inline-badge">${escapeHtml(comment.userEmail)}</span>
-                <span class="inline-badge inline-badge--neutral">${escapeHtml(comment.category)}</span>
-                <span class="inline-badge inline-badge--${escapeHtml(comment.severity)}">${escapeHtml(
-                  comment.severity,
-                )}</span>
-                <span class="inline-badge ${comment.isResolved ? "inline-badge--muted" : "inline-badge--warning"}">
-                  ${comment.isResolved ? "resolved" : "unresolved"}
-                </span>
-                ${
-                  comment.isUserDisabled
-                    ? `<span class="inline-badge inline-badge--danger">user disabled</span>`
-                    : ""
-                }
-              </div>
-              <h3>${escapeHtml(comment.summary)}</h3>
-              <small>${formatTimestamp(comment.createdAt)}</small>
-            </div>
-
-            <button
-              class="button-secondary button-secondary--small"
-              type="button"
-              data-comment-id="${escapeHtml(comment.id)}"
-              data-resolved="${String(!comment.isResolved)}"
-            >
-              ${comment.isResolved ? "Reopen" : "Resolve"}
-            </button>
-          </div>
-
-          <div class="comment-card__body">
-            <p><strong>What happened:</strong> ${escapeHtml(comment.happened)}</p>
-            <p><strong>How to reproduce:</strong> ${escapeHtml(comment.reproduceSteps)}</p>
-            ${
-              comment.expectedBehavior
-                ? `<p><strong>Expected:</strong> ${escapeHtml(comment.expectedBehavior)}</p>`
-                : ""
-            }
-            ${
-              comment.extraDetails
-                ? `<p><strong>Extra details:</strong> ${escapeHtml(comment.extraDetails)}</p>`
-                : ""
-            }
-            ${
-              comment.affectedUrl
-                ? `<p><strong>Affected URL:</strong> <a class="text-link" href="${escapeHtml(
-                    comment.affectedUrl,
-                  )}" target="_blank" rel="noreferrer">${escapeHtml(comment.affectedUrl)}</a></p>`
-                : ""
-            }
-          </div>
-        </article>
-      `,
-    )
-    .join("");
+  commentsContainer.replaceChildren(...comments.map(createCommentCard));
 }
 
 function showStatus(message, variant) {
@@ -330,21 +268,153 @@ function showStatus(message, variant) {
   statusPanel.dataset.variant = variant;
 }
 
-function formatTimestamp(value) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "Unknown time"
-    : parsed.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+function redirectIfUnauthorized(response) {
+  if (response.status === 401) {
+    window.location.assign("/");
+    return true;
+  }
+
+  if (response.status === 403) {
+    window.location.assign("/dashboard");
+    return true;
+  }
+
+  return false;
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function createUserCard(user) {
+  const isCurrentAdmin = currentSession?.user?.id === user.id;
+  const statusClass = user.isDisabled ? "inline-badge--danger" : "inline-badge--success";
+
+  return element(
+    "article",
+    {
+      className: `admin-user-card${user.isDisabled ? " admin-user-card--disabled" : ""}`,
+    },
+    [
+      element("div", { className: "admin-user-card__head" }, [
+        element("div", {}, [
+          element("strong", { text: user.email }),
+          element("p", {}, [
+            element("span", { className: "inline-badge", text: user.role }),
+            element("span", {
+              className: `inline-badge ${statusClass}`,
+              text: user.isDisabled ? "disabled" : "active",
+            }),
+          ]),
+        ]),
+        element("button", {
+          className: "button-secondary button-secondary--small",
+          type: "button",
+          text: user.isDisabled ? "Enable" : "Disable",
+          disabled: isCurrentAdmin,
+          dataset: {
+            userId: user.id,
+            disabled: String(!user.isDisabled),
+          },
+        }),
+      ]),
+      element("small", {
+        text: [
+          `${user.unresolvedCommentCount} unresolved`,
+          `${user.totalCommentCount} total comments`,
+        ].join(" / "),
+      }),
+    ],
+  );
+}
+
+function createCommentCard(comment) {
+  const severity = variant(comment.severity, severityLevels, "medium");
+  const body = element("div", { className: "comment-card__body" }, [
+    detailLine("What happened:", comment.happened),
+    detailLine("How to reproduce:", comment.reproduceSteps),
+    comment.expectedBehavior ? detailLine("Expected:", comment.expectedBehavior) : null,
+    comment.extraDetails ? detailLine("Extra details:", comment.extraDetails) : null,
+    createAffectedUrlLine(comment.affectedUrl),
+  ]);
+
+  return element(
+    "article",
+    {
+      className: `comment-card${comment.isResolved ? " comment-card--resolved" : ""}`,
+    },
+    [
+      element("div", { className: "comment-card__head" }, [
+        element("div", {}, [
+          element("div", { className: "comment-card__meta" }, [
+            badge(comment.userEmail),
+            badge(comment.category, "inline-badge--neutral"),
+            badge(comment.severity, `inline-badge--${severity}`),
+            badge(
+              comment.isResolved ? "resolved" : "unresolved",
+              comment.isResolved ? "inline-badge--muted" : "inline-badge--warning",
+            ),
+            comment.isUserDisabled ? badge("user disabled", "inline-badge--danger") : null,
+          ]),
+          element("h3", { text: comment.summary || "Untitled comment" }),
+          element("small", { text: formatTimestamp(comment.createdAt) }),
+        ]),
+        element("button", {
+          className: "button-secondary button-secondary--small",
+          type: "button",
+          text: comment.isResolved ? "Reopen" : "Resolve",
+          dataset: {
+            commentId: comment.id,
+            resolved: String(!comment.isResolved),
+          },
+        }),
+      ]),
+      body,
+    ],
+  );
+}
+
+function badge(text, modifier = "") {
+  return element("span", {
+    className: `inline-badge${modifier ? ` ${modifier}` : ""}`,
+    text,
+  });
+}
+
+function detailLine(label, value) {
+  const paragraph = element("p");
+  paragraph.append(element("strong", { text: label }), " ", String(value || ""));
+  return paragraph;
+}
+
+function createAffectedUrlLine(url) {
+  if (!url) {
+    return null;
+  }
+
+  const paragraph = element("p");
+  paragraph.append(element("strong", { text: "Affected URL:" }), " ");
+
+  if (isSafeHttpUrl(url)) {
+    paragraph.append(
+      element("a", {
+        className: "text-link",
+        href: url,
+        text: url,
+        attrs: {
+          target: "_blank",
+          rel: "noreferrer",
+        },
+      }),
+    );
+  } else {
+    paragraph.append(String(url));
+  }
+
+  return paragraph;
+}
+
+function isSafeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
 }
