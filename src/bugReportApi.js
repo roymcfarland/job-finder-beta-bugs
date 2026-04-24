@@ -1,24 +1,24 @@
-import { buildBugReportSubmission, ValidationError } from "./bugReportSchema.js";
+import { ValidationError } from "./bugReportSchema.js";
+import { BugReportConfigurationError } from "./bugReportService.js";
 import { getConfig } from "./config.js";
-import { getSecurityHeaders } from "./http.js";
+import { buildApiHeaders, jsonResponse, parseJsonObject } from "./http.js";
 import { createRateLimitStore } from "./rateLimitStore.js";
-import { createDeliveryService } from "./reportDelivery.js";
 
 export function createBugReportApi(options = {}) {
   const config = options.config ?? getConfig();
-  const now = options.now ?? (() => Date.now());
   const logger = options.logger ?? console;
+  const authService = options.authService;
+  const bugReportService = options.bugReportService;
   const rateLimiter =
     options.rateLimiter ??
     createRateLimitStore({
-      limit: config.rateLimitMax,
-      windowMs: config.rateLimitWindowMs,
+      limit: config.reportRateLimitMax,
+      windowMs: config.reportRateLimitWindowMs,
     });
-  const delivery = options.delivery ?? createDeliveryService(config, options);
 
   return {
     async handle(request) {
-      const headers = buildResponseHeaders(config.allowedOrigin, request.origin);
+      const headers = buildApiHeaders(config.allowedOrigin, request.origin);
 
       if (request.method === "OPTIONS") {
         return {
@@ -26,6 +26,39 @@ export function createBugReportApi(options = {}) {
           headers,
           body: null,
         };
+      }
+
+      const session = await authService.getSessionFromCookie(request.cookieHeader);
+      if (!session?.user) {
+        return jsonResponse(401, { error: "Unauthorized." }, headers);
+      }
+
+      if (request.pathname === "/api/reports") {
+        if (request.method !== "GET") {
+          return jsonResponse(
+            405,
+            { error: "Method not allowed." },
+            {
+              ...headers,
+              allow: "GET, OPTIONS",
+            },
+          );
+        }
+
+        try {
+          const reports = await bugReportService.listForUser(session.user.id);
+          return jsonResponse(200, { reports }, headers);
+        } catch (error) {
+          if (error instanceof BugReportConfigurationError) {
+            return jsonResponse(503, { error: error.message }, headers);
+          }
+
+          throw error;
+        }
+      }
+
+      if (request.pathname !== "/api/report") {
+        return jsonResponse(404, { error: "Not found." }, headers);
       }
 
       if (request.method !== "POST") {
@@ -43,18 +76,15 @@ export function createBugReportApi(options = {}) {
 
       try {
         payload = parseJsonObject(request.rawBody);
-      } catch (error) {
-        logger.warn("Invalid bug-report payload", error);
+      } catch {
         return jsonResponse(400, { error: "Send a valid JSON payload." }, headers);
       }
 
-      const rateLimitResult = rateLimiter.consume(request.ip || "unknown", now());
+      const rateLimitResult = rateLimiter.consume(request.ip || "unknown", Date.now());
       if (!rateLimitResult.allowed) {
         return jsonResponse(
           429,
-          {
-            error: "Too many reports from this connection. Please try again shortly.",
-          },
+          { error: "Too many reports from this connection. Please try again shortly." },
           {
             ...headers,
             "retry-after": String(rateLimitResult.retryAfterSeconds),
@@ -62,13 +92,22 @@ export function createBugReportApi(options = {}) {
         );
       }
 
-      let report;
-
       try {
-        report = buildBugReportSubmission(payload, {
-          now: new Date(now()),
+        const result = await bugReportService.submit({
+          user: session.user,
+          payload,
           userAgent: request.userAgent,
         });
+
+        return jsonResponse(
+          201,
+          {
+            message: "Thanks, your bug report is in.",
+            reportId: result.reportId,
+            notificationMode: result.notificationMode,
+          },
+          headers,
+        );
       } catch (error) {
         if (error instanceof ValidationError) {
           return jsonResponse(
@@ -81,77 +120,17 @@ export function createBugReportApi(options = {}) {
           );
         }
 
-        logger.error("Failed to validate bug report", error);
+        if (error instanceof BugReportConfigurationError) {
+          return jsonResponse(503, { error: error.message }, headers);
+        }
+
+        logger.error("Bug report submission failed", error);
         return jsonResponse(
           500,
-          { error: "Something went wrong while validating this report." },
-          headers,
-        );
-      }
-
-      try {
-        const deliveryResult = await delivery.send(report);
-
-        return jsonResponse(
-          201,
-          {
-            message: "Thanks, your bug report is in.",
-            reportId: report.meta.submissionId,
-            deliveryMode: deliveryResult.mode,
-          },
-          headers,
-        );
-      } catch (error) {
-        logger.error("Bug report delivery failed", error);
-
-        return jsonResponse(
-          503,
-          {
-            error:
-              "Bug report delivery is temporarily unavailable. Please try again in a few minutes.",
-          },
+          { error: "Something went wrong while saving this report." },
           headers,
         );
       }
     },
-  };
-}
-
-function parseJsonObject(rawBody) {
-  if (!rawBody) {
-    throw new Error("Request body is empty.");
-  }
-
-  const parsed = JSON.parse(rawBody);
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Payload must be a JSON object.");
-  }
-
-  return parsed;
-}
-
-function buildResponseHeaders(allowedOrigin, requestOrigin) {
-  const corsHeaders =
-    allowedOrigin && requestOrigin === allowedOrigin
-      ? {
-          "access-control-allow-origin": allowedOrigin,
-          "access-control-allow-headers": "content-type",
-          "access-control-allow-methods": "POST, OPTIONS",
-        }
-      : {};
-
-  return {
-    ...getSecurityHeaders(),
-    ...corsHeaders,
-    "content-type": "application/json; charset=utf-8",
-  };
-}
-
-function jsonResponse(status, payload, headers) {
-  return {
-    status,
-    headers,
-    body: JSON.stringify(payload),
   };
 }

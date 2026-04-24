@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bug Dashboard</title>
+    <meta
+      name="description"
+      content="Submit bug reports for JobFinder.guru beta."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/dashboard.js" defer></script>
+  </head>
+  <body>
+    <main class="site-shell">
+      <header class="dashboard-header">
+        <div>
+          <p class="eyebrow">JobFinder.guru beta</p>
+          <h1 class="dashboard-title">Bug report dashboard</h1>
+          <p class="dashboard-subtitle">
+            Signed in as <strong id="session-email">loading...</strong>
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <a
+            id="admin-link"
+            class="button-link button-link--secondary hidden"
+            href="/admin"
+          >
+            Admin
+          </a>
+          <a class="button-link button-link--secondary" href="/">Home</a>
+          <button id="logout-button" class="button-secondary" type="button">
+            Log out
+          </button>
+        </div>
+      </header>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <h2>Send a bug report</h2>
+          <p class="panel-copy">
+            The account email is attached automatically, so focus on what broke and how
+            to reproduce it.
+          </p>
+
+          <form id="bug-report-form" novalidate>
+            <label class="field">
+              <span>One-line summary</span>
+              <input
+                id="summary"
+                name="summary"
+                type="text"
+                maxlength="140"
+                required
+                placeholder="Saved jobs page crashes after applying filters"
+              />
+              <p class="field-error" data-error-for="summary"></p>
+            </label>
+
+            <div class="grid two-up">
+              <label class="field">
+                <span>Category</span>
+                <select id="category" name="category" required>
+                  <option value="">Choose one</option>
+                  <option value="broken-page">Broken page or flow</option>
+                  <option value="wrong-results">Wrong jobs or bad data</option>
+                  <option value="account">Account or login</option>
+                  <option value="performance">Slow or unreliable</option>
+                  <option value="payments">Billing or subscription</option>
+                  <option value="other">Other</option>
+                </select>
+                <p class="field-error" data-error-for="category"></p>
+              </label>
+
+              <label class="field">
+                <span>Severity</span>
+                <select id="severity" name="severity" required>
+                  <option value="">Choose one</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="blocking">Blocking</option>
+                </select>
+                <p class="field-error" data-error-for="severity"></p>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Affected page or flow <span class="muted">(optional)</span></span>
+              <input
+                id="affectedUrl"
+                name="affectedUrl"
+                type="url"
+                inputmode="url"
+                placeholder="https://jobfinder.guru/..."
+              />
+              <p class="field-error" data-error-for="affectedUrl"></p>
+            </label>
+
+            <label class="field">
+              <span>What happened?</span>
+              <textarea
+                id="happened"
+                name="happened"
+                rows="5"
+                required
+                placeholder="Tell me what went wrong and what you saw."
+              ></textarea>
+              <p class="field-error" data-error-for="happened"></p>
+            </label>
+
+            <label class="field">
+              <span>How can I reproduce it?</span>
+              <textarea
+                id="reproduceSteps"
+                name="reproduceSteps"
+                rows="5"
+                required
+                placeholder="1. Open saved jobs&#10;2. Apply a filter&#10;3. Click next page"
+              ></textarea>
+              <p class="field-error" data-error-for="reproduceSteps"></p>
+            </label>
+
+            <div class="grid two-up">
+              <label class="field">
+                <span>Expected behavior <span class="muted">(optional)</span></span>
+                <textarea
+                  id="expectedBehavior"
+                  name="expectedBehavior"
+                  rows="4"
+                  placeholder="The filtered list should load normally."
+                ></textarea>
+                <p class="field-error" data-error-for="expectedBehavior"></p>
+              </label>
+
+              <label class="field">
+                <span>Extra details or links <span class="muted">(optional)</span></span>
+                <textarea
+                  id="extraDetails"
+                  name="extraDetails"
+                  rows="4"
+                  placeholder="Loom link, console error, browser version..."
+                ></textarea>
+                <p class="field-error" data-error-for="extraDetails"></p>
+              </label>
+            </div>
+
+            <input id="startedAt" name="startedAt" type="hidden" />
+            <input
+              id="website"
+              name="website"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+              class="honeypot"
+              aria-hidden="true"
+            />
+
+            <div class="actions">
+              <button id="submit-button" class="button-primary" type="submit">
+                Send bug report
+              </button>
+              <p class="meta-copy">
+                Paste a screenshot, Loom, or log link into the notes field if it helps.
+              </p>
+            </div>
+
+            <section id="form-status" class="status" aria-live="polite"></section>
+          </form>
+        </section>
+
+        <aside class="panel panel--sidebar">
+          <h2>Recent reports</h2>
+          <p class="panel-copy">
+            Your last few submissions appear here once they’re stored. Resolved reports
+            are shadowed out automatically.
+          </p>
+          <div id="recent-reports" class="report-list empty-state">
+            No reports yet.
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

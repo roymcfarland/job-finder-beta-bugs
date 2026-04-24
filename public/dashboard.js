@@ -2,18 +2,52 @@ const form = document.querySelector("#bug-report-form");
 const statusPanel = document.querySelector("#form-status");
 const submitButton = document.querySelector("#submit-button");
 const startedAtField = document.querySelector("#startedAt");
-const storageKey = "jobfinder-beta-bugs:draft:v1";
+const logoutButton = document.querySelector("#logout-button");
+const sessionEmail = document.querySelector("#session-email");
+const recentReports = document.querySelector("#recent-reports");
+const adminLink = document.querySelector("#admin-link");
+const storageKey = "jobfinder-beta-bugs:report-draft:v2";
 
 initialize();
 
-form.addEventListener("submit", async (event) => {
+form.addEventListener("submit", handleSubmit);
+form.addEventListener("input", persistDraft);
+logoutButton.addEventListener("click", handleLogout);
+
+async function initialize() {
+  const session = await loadSession();
+  sessionEmail.textContent = session.user.email;
+
+  if (session.user.role === "admin") {
+    adminLink.classList.remove("hidden");
+  }
+
+  restoreDraft();
+  setStartedAt();
+  await loadRecentReports();
+}
+
+async function loadSession() {
+  const response = await fetch("/api/auth/session");
+
+  if (response.status === 401) {
+    window.location.assign("/");
+    throw new Error("Unauthorized");
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load session.");
+  }
+
+  return response.json();
+}
+
+async function handleSubmit(event) {
   event.preventDefault();
   clearErrors();
   setBusy(true);
 
   const payload = {
-    name: getFieldValue("name"),
-    email: getFieldValue("email"),
     summary: getFieldValue("summary"),
     category: getFieldValue("category"),
     severity: getFieldValue("severity"),
@@ -38,6 +72,11 @@ form.addEventListener("submit", async (event) => {
 
     const data = await response.json().catch(() => ({}));
 
+    if (response.status === 401) {
+      window.location.assign("/");
+      return;
+    }
+
     if (!response.ok) {
       applyErrors(data.fieldErrors ?? {});
       showStatus(
@@ -51,27 +90,80 @@ form.addEventListener("submit", async (event) => {
     form.reset();
     setStartedAt();
     showStatus(
-      `Thanks. Your report is in${data.reportId ? ` (${data.reportId})` : ""}.`,
+      `Thanks. Your report is stored${data.reportId ? ` (${data.reportId})` : ""}.`,
       "success",
     );
+    await loadRecentReports();
   } catch {
-    showStatus(
-      "Network error. Please try again in a minute, or paste the report directly to me.",
-      "error",
-    );
+    showStatus("Network error. Please try again in a minute.", "error");
   } finally {
     setBusy(false);
   }
-});
+}
 
-form.addEventListener("input", () => {
-  persistDraft();
-});
+async function handleLogout() {
+  logoutButton.disabled = true;
 
-function initialize() {
-  restoreDraft();
-  prefillAffectedUrlFromQuery();
-  setStartedAt();
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    window.location.assign("/");
+  }
+}
+
+async function loadRecentReports() {
+  try {
+    const response = await fetch("/api/reports");
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    renderReports(data.reports ?? []);
+  } catch {
+    renderReports([]);
+  }
+}
+
+function renderReports(reports) {
+  if (!reports.length) {
+    recentReports.className = "report-list empty-state";
+    recentReports.textContent = "No reports yet.";
+    return;
+  }
+
+  recentReports.className = "report-list";
+  recentReports.innerHTML = reports
+    .map(
+      (report) => `
+        <article class="report-item">
+          <div class="report-item__state ${
+            report.isResolved ? "report-item__state--resolved" : "report-item__state--open"
+          }">
+            ${report.isResolved ? "Resolved" : "Unresolved"}
+          </div>
+          <div class="report-item__head">
+            <strong>${escapeHtml(report.summary)}</strong>
+            <span class="report-badge report-badge--${escapeHtml(report.severity)}">${escapeHtml(
+              report.severity,
+            )}</span>
+          </div>
+          <p>${escapeHtml(report.category)} • ${formatTimestamp(report.createdAt)}</p>
+          <small>${escapeHtml(report.id)}</small>
+        </article>
+      `,
+    )
+    .join("");
+
+  for (const [index, report] of reports.entries()) {
+    if (!report.isResolved) {
+      continue;
+    }
+
+    recentReports.children[index]?.classList.add("report-item--resolved");
+  }
 }
 
 function setStartedAt() {
@@ -89,8 +181,6 @@ function collectClientContext() {
 
 function persistDraft() {
   const draft = {
-    name: getFieldValue("name"),
-    email: getFieldValue("email"),
     summary: getFieldValue("summary"),
     category: getFieldValue("category"),
     severity: getFieldValue("severity"),
@@ -112,7 +202,6 @@ function restoreDraft() {
 
   try {
     const draft = JSON.parse(rawDraft);
-
     for (const [key, value] of Object.entries(draft)) {
       const field = getField(key);
 
@@ -122,15 +211,6 @@ function restoreDraft() {
     }
   } catch {
     localStorage.removeItem(storageKey);
-  }
-}
-
-function prefillAffectedUrlFromQuery() {
-  const params = new URLSearchParams(window.location.search);
-  const page = params.get("page");
-
-  if (page && !getFieldValue("affectedUrl")) {
-    getField("affectedUrl").value = page;
   }
 }
 
@@ -181,4 +261,23 @@ function getField(name) {
 
 function getFieldValue(name) {
   return getField(name)?.value ?? "";
+}
+
+function formatTimestamp(value) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? "Unknown time"
+    : parsed.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

@@ -6,35 +6,37 @@ import {
   buildBugReportSubmission,
 } from "../src/bugReportSchema.js";
 
-const validPayload = {
-  name: "Taylor Beta",
-  email: "taylor@example.com",
-  summary: "Saved jobs page crashes",
-  category: "broken-page",
-  severity: "high",
-  affectedUrl: "https://jobfinder.guru/saved",
-  happened: "The page shows a blank screen after I click apply filters.",
-  reproduceSteps: "Open saved jobs and filter by remote jobs.",
-  expectedBehavior: "The list should refresh normally.",
-  extraDetails: "Chrome 124 on macOS",
-  startedAt: Date.now() - 5000,
-  website: "",
-  clientContext: {
-    language: "en-US",
-    timeZone: "America/Chicago",
-    platform: "macOS",
-    viewport: "1440x900",
-  },
-};
+function buildValidPayload(startedAt = Date.now() - 5000) {
+  return {
+    name: "Taylor Beta",
+    email: "taylor@example.com",
+    summary: "Saved jobs page crashes",
+    category: "broken-page",
+    severity: "high",
+    affectedUrl: "https://jobfinder.guru/saved",
+    happened: "The page shows a blank screen after I click apply filters.",
+    reproduceSteps: "Open saved jobs and filter by remote jobs.",
+    expectedBehavior: "The list should refresh normally.",
+    extraDetails: "Chrome 124 on macOS",
+    startedAt,
+    website: "",
+    clientContext: {
+      language: "en-US",
+      timeZone: "America/Chicago",
+      platform: "macOS",
+      viewport: "1440x900",
+    },
+  };
+}
 
 test("buildBugReportSubmission returns a normalized report", () => {
   const now = new Date("2026-04-23T12:00:00.000Z");
-  const report = buildBugReportSubmission(validPayload, {
+  const report = buildBugReportSubmission(buildValidPayload(now.getTime() - 5000), {
     now,
     userAgent: "Mozilla/5.0",
   });
 
-  assert.equal(report.report.summary, validPayload.summary);
+  assert.equal(report.report.summary, "Saved jobs page crashes");
   assert.equal(report.report.severity, "high");
   assert.equal(report.reporter.email, "taylor@example.com");
   assert.equal(report.meta.submittedAt, now.toISOString());
@@ -46,7 +48,7 @@ test("buildBugReportSubmission rejects missing required fields", () => {
     () =>
       buildBugReportSubmission(
         {
-          ...validPayload,
+          ...buildValidPayload(),
           summary: "",
           reproduceSteps: "",
         },
@@ -69,7 +71,7 @@ test("buildBugReportSubmission rejects obvious bot traffic", () => {
     () =>
       buildBugReportSubmission(
         {
-          ...validPayload,
+          ...buildValidPayload(),
           website: "https://spam.example",
         },
         { now: new Date() },

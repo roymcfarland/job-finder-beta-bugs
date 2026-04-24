@@ -5,6 +5,13 @@ export class BodyTooLargeError extends Error {
   }
 }
 
+export class InvalidJsonError extends Error {
+  constructor() {
+    super("Payload must be a JSON object.");
+    this.name = "InvalidJsonError";
+  }
+}
+
 export function getClientIp(headers, fallback = "") {
   const forwardedFor = headers["x-forwarded-for"];
 
@@ -84,4 +91,107 @@ export function getMimeType(filePath) {
   }
 
   return "application/octet-stream";
+}
+
+export function parseJsonObject(rawBody) {
+  if (!rawBody) {
+    throw new InvalidJsonError();
+  }
+
+  const parsed = JSON.parse(rawBody);
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new InvalidJsonError();
+  }
+
+  return parsed;
+}
+
+export function jsonResponse(status, payload, headers = {}) {
+  return {
+    status,
+    headers: {
+      ...headers,
+      "content-type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(payload),
+  };
+}
+
+export function redirectResponse(location, status = 302, headers = {}) {
+  return {
+    status,
+    headers: {
+      ...headers,
+      location,
+    },
+    body: null,
+  };
+}
+
+export function buildApiHeaders(allowedOrigin, requestOrigin) {
+  const corsHeaders =
+    allowedOrigin && requestOrigin === allowedOrigin
+      ? {
+          "access-control-allow-origin": allowedOrigin,
+          "access-control-allow-headers": "content-type",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+        }
+      : {};
+
+  return {
+    ...getSecurityHeaders(),
+    ...corsHeaders,
+    "cache-control": "no-store",
+  };
+}
+
+export function parseCookies(cookieHeader = "") {
+  const cookies = {};
+
+  for (const part of cookieHeader.split(";")) {
+    const trimmed = part.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const name = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    cookies[name] = decodeURIComponent(value);
+  }
+
+  return cookies;
+}
+
+export function serializeCookie(name, value, options = {}) {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+
+  parts.push(`Path=${options.path ?? "/"}`);
+
+  if (options.httpOnly !== false) {
+    parts.push("HttpOnly");
+  }
+
+  if (options.sameSite) {
+    parts.push(`SameSite=${options.sameSite}`);
+  }
+
+  if (options.secure) {
+    parts.push("Secure");
+  }
+
+  if (typeof options.maxAge === "number") {
+    parts.push(`Max-Age=${Math.max(0, Math.floor(options.maxAge))}`);
+  }
+
+  if (options.expires instanceof Date) {
+    parts.push(`Expires=${options.expires.toUTCString()}`);
+  }
+
+  return parts.join("; ");
 }

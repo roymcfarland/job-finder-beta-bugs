@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobFinder.guru Beta Bugs</title>
+    <meta
+      name="description"
+      content="Sign in to JobFinder.guru beta bug reporting."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/landing.js" defer></script>
+  </head>
+  <body>
+    <main class="site-shell site-shell--split">
+      <section class="hero hero--landing">
+        <p class="eyebrow">JobFinder.guru beta</p>
+        <h1>Bug reporting, now with real accounts.</h1>
+        <p class="lede">
+          Beta testers can create an account, sign in, file structured bug reports,
+          and reset their password by email without needing you to do it manually.
+        </p>
+
+        <div class="feature-stack">
+          <article class="feature-card">
+            <h2>Built for triage</h2>
+            <p>
+              Reports capture severity, reproduction steps, affected URLs, and recent
+              submission history.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <h2>Account-backed access</h2>
+            <p>
+              Email and password accounts protect the reporting flow while keeping the
+              experience lightweight.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <h2>Password resets by email</h2>
+            <p>
+              When a tester gets locked out, they can recover access from the landing
+              page instead of pinging you.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="auth-card">
+        <div id="session-cta" class="session-cta hidden">
+          <p>You’re already signed in.</p>
+          <a class="button-link" href="/dashboard">Open bug dashboard</a>
+        </div>
+
+        <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+          <button class="auth-tab is-active" type="button" data-mode="login">
+            Log in
+          </button>
+          <button class="auth-tab" type="button" data-mode="register">
+            Create account
+          </button>
+          <button class="auth-tab" type="button" data-mode="forgot">
+            Reset password
+          </button>
+        </div>
+
+        <section class="auth-panel" data-panel="login">
+          <h2>Sign in</h2>
+          <p class="panel-copy">Use the email and password you created for beta access.</p>
+
+          <form id="login-form" novalidate>
+            <label class="field">
+              <span>Email</span>
+              <input name="email" type="email" autocomplete="email" />
+              <p class="field-error" data-error-for="login-email"></p>
+            </label>
+
+            <label class="field">
+              <span>Password</span>
+              <input
+                name="password"
+                type="password"
+                autocomplete="current-password"
+              />
+              <p class="field-error" data-error-for="login-password"></p>
+            </label>
+
+            <button class="button-primary" type="submit">Log in</button>
+          </form>
+        </section>
+
+        <section class="auth-panel hidden" data-panel="register">
+          <h2>Create account</h2>
+          <p class="panel-copy">
+            Self-serve registration is enabled for beta testers. You can sign in right
+            after creating your account.
+          </p>
+
+          <form id="register-form" novalidate>
+            <label class="field">
+              <span>Email</span>
+              <input name="email" type="email" autocomplete="email" />
+              <p class="field-error" data-error-for="register-email"></p>
+            </label>
+
+            <label class="field">
+              <span>Password</span>
+              <input
+                name="password"
+                type="password"
+                autocomplete="new-password"
+              />
+              <small>Use at least 10 characters.</small>
+              <p class="field-error" data-error-for="register-password"></p>
+            </label>
+
+            <button class="button-primary" type="submit">Create account</button>
+          </form>
+        </section>
+
+        <section class="auth-panel hidden" data-panel="forgot">
+          <h2>Reset password</h2>
+          <p class="panel-copy">
+            Enter your account email and we’ll send a password reset link if it exists.
+          </p>
+
+          <form id="forgot-form" novalidate>
+            <label class="field">
+              <span>Email</span>
+              <input name="email" type="email" autocomplete="email" />
+              <p class="field-error" data-error-for="forgot-email"></p>
+            </label>
+
+            <button class="button-primary" type="submit">Send reset link</button>
+          </form>
+        </section>
+
+        <section id="auth-status" class="status" aria-live="polite"></section>
+      </section>
+    </main>
+  </body>
+</html>

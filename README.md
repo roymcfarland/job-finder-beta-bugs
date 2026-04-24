@@ -1,28 +1,31 @@
-# JobFinder.guru Beta Bug Reports
+# JobFinder.guru Beta Bugs
 
-Small, dependency-light bug intake app for JobFinder.guru beta users.
+Small Node app for authenticated beta bug reporting.
 
-It gives you:
+It now includes:
 
-- A clean standalone form beta users can fill out in under two minutes
-- Structured reports with reproduction steps, severity, and page context
-- Spam protection via a honeypot and minimum form-fill time
-- In-memory rate limiting to reduce endpoint abuse
-- Flexible delivery through Resend email, a generic webhook, or local file logging
-- Two deployment paths: plain Node hosting or Vercel
+- Email/password accounts for beta testers
+- Password reset by email
+- Admin accounts with user disable/enable controls
+- An admin comment dashboard with resolve/reopen toggles and filters
+- A public landing page with login, sign-up, and reset flows
+- A protected bug-report dashboard behind session cookies
+- Postgres-backed storage for users, sessions, reset tokens, and bug reports
+- Optional bug-report notifications through Resend or a webhook
 
 ## Quick start
 
 1. Copy `.env.example` to `.env`
-2. Configure one delivery mode:
-   - Resend email: `RESEND_API_KEY`, `BUG_REPORT_TO_EMAIL`, `BUG_REPORT_FROM_EMAIL`
-   - Webhook: `REPORT_WEBHOOK_URL` and optional `REPORT_WEBHOOK_TOKEN`
-   - Local file: `REPORT_LOG_PATH=./data/reports.ndjson`
-3. Run `npm start`
-4. Open [http://localhost:3000](http://localhost:3000)
+2. Install dependencies with `npm install`
+3. Configure:
+   - Postgres: `DATABASE_URL` locally, or let Vercel inject a Postgres connection variable in production
+   - Resend for password resets: `RESEND_API_KEY` and `EMAIL_FROM`
+   - Admin bootstrap: `ADMIN_EMAILS` with your own email address
+   - Optional bug report notifications: `BUG_REPORT_NOTIFICATION_TO_EMAIL` or `REPORT_WEBHOOK_URL`
+4. Run `npm start`
+5. Open [http://127.0.0.1:3000](http://127.0.0.1:3000)
 
-Local development defaults to `HOST=127.0.0.1`. For public container hosts, set
-`HOST=0.0.0.0`.
+The app auto-loads `.env` and `.env.local` in local development.
 
 ## Scripts
 
@@ -30,57 +33,52 @@ Local development defaults to `HOST=127.0.0.1`. For public container hosts, set
 - `npm run dev` starts the app with `node --watch`
 - `npm test` runs the built-in Node tests
 
-## Deployment
+## Environment variables
 
-### Option 1: plain Node host
-
-This is the simplest path for Railway, Render, Fly.io, a VPS, or any container host:
-
-- Set the same environment variables from `.env.example`
-- Use `npm start` as the start command
-- Point your domain or subdomain to the deployed service
-
-### Option 2: Vercel
-
-The repo also includes `api/report.js`, so Vercel can serve the static frontend from `public/` and the API from `/api/report`.
-
-- Import the repo into Vercel
-- Add the same environment variables
-- Deploy
-
-## Delivery modes
-
-### Resend email
-
-Recommended if you want bug reports sent directly to your inbox.
-
-Required environment variables:
+Required for the full production flow:
 
 - `RESEND_API_KEY`
-- `BUG_REPORT_TO_EMAIL`
-- `BUG_REPORT_FROM_EMAIL`
+- `EMAIL_FROM`
+- `APP_BASE_URL`
+- `ADMIN_EMAILS`
 
-### Generic webhook
+Database configuration:
 
-Recommended if you want to send reports to Slack, Make, Zapier, a custom API, or a queue.
+- `DATABASE_URL` for local or generic Postgres hosting
+- Vercel storage integrations may inject `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, or related variables, and the app will use them automatically
 
-Required environment variables:
+Optional:
 
+- `BUG_REPORT_NOTIFICATION_TO_EMAIL`
 - `REPORT_WEBHOOK_URL`
-- `REPORT_WEBHOOK_TOKEN` is optional
+- `REPORT_WEBHOOK_TOKEN`
+- `ALLOWED_ORIGIN` if your frontend and API are on different origins
 
-The webhook receives the full structured JSON report body.
+## Admin behavior
 
-### Local file logging
+- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account.
+- Admins can disable or re-enable user accounts.
+- Disabled users lose active sessions immediately and cannot sign in again until re-enabled.
+- Admins can filter user comments by reporter and by resolved/unresolved state.
+- Comment resolution is a live toggle, so resolved comments can be reopened without reloading the page.
 
-Useful for local development or self-hosting.
+## Deployment
 
-- `REPORT_LOG_PATH=./data/reports.ndjson`
+### Plain Node host
 
-Each submitted report is appended as a single JSON line.
+- Set the environment variables from `.env.example`
+- Use `npm start`
+- Point a domain or subdomain at the service
+
+### Vercel
+
+- Import the repo into Vercel
+- Attach a Postgres integration or set `DATABASE_URL` manually
+- Add `RESEND_API_KEY`, `EMAIL_FROM`, and `APP_BASE_URL`
+- Deploy
 
 ## Notes
 
-- File uploads are intentionally omitted to keep deployment and hosting simple.
-- The form accepts links to screenshots, Loom videos, or console dumps instead.
-- In production, the app returns `503` until a real delivery mode is configured.
+- Password reset requires a working Resend configuration in production.
+- Bug reports are stored in Postgres first, so missing notification settings no longer block report submission.
+- File uploads are intentionally omitted to keep the app lightweight and easy to deploy.

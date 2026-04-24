@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Dashboard</title>
+    <meta
+      name="description"
+      content="Admin tools for JobFinder.guru beta bug reporting."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/admin.js" defer></script>
+  </head>
+  <body>
+    <main class="site-shell">
+      <header class="dashboard-header">
+        <div>
+          <p class="eyebrow">JobFinder.guru beta admin</p>
+          <h1 class="dashboard-title">Admin dashboard</h1>
+          <p class="dashboard-subtitle">
+            Signed in as <strong id="admin-email">loading...</strong>
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <a class="button-link button-link--secondary" href="/dashboard">
+            User dashboard
+          </a>
+          <button id="admin-logout-button" class="button-secondary" type="button">
+            Log out
+          </button>
+        </div>
+      </header>
+
+      <section class="admin-summary-grid">
+        <article class="summary-card">
+          <small>Total users</small>
+          <strong id="summary-total-users">0</strong>
+        </article>
+        <article class="summary-card">
+          <small>Disabled users</small>
+          <strong id="summary-disabled-users">0</strong>
+        </article>
+        <article class="summary-card">
+          <small>Unresolved comments</small>
+          <strong id="summary-unresolved-comments">0</strong>
+        </article>
+        <article class="summary-card">
+          <small>Resolved comments</small>
+          <strong id="summary-resolved-comments">0</strong>
+        </article>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid--admin">
+        <section class="panel panel--sidebar">
+          <h2>User accounts</h2>
+          <p class="panel-copy">
+            Disable access instantly. Disabled users lose active sessions and can’t sign
+            back in until re-enabled.
+          </p>
+
+          <div id="admin-users" class="admin-user-list empty-state">
+            Loading users...
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>User comments</h2>
+              <p class="panel-copy">
+                Filter by user and status, then resolve or reopen comments on the fly.
+              </p>
+            </div>
+          </div>
+
+          <div class="filter-row">
+            <label class="field field--compact">
+              <span>User</span>
+              <select id="filter-user">
+                <option value="">All users</option>
+              </select>
+            </label>
+
+            <label class="field field--compact">
+              <span>Status</span>
+              <select id="filter-status">
+                <option value="all">All</option>
+                <option value="unresolved">Unresolved</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="admin-comments" class="admin-comment-list empty-state">
+            Loading comments...
+          </div>
+
+          <section id="admin-status" class="status" aria-live="polite"></section>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
