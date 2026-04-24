@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>JobFinder.guru Beta Bugs</title>
+    <title>Atlas Bug Reporter</title>
     <meta
       name="description"
-      content="Sign in to JobFinder.guru beta bug reporting."
+      content="Sign in to Atlas bug reporting."
     />
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/landing.js" defer></script>
@@ -14,44 +14,23 @@
   <body>
     <main class="site-shell site-shell--split">
       <section class="hero hero--landing">
-        <p class="eyebrow">JobFinder.guru beta</p>
-        <h1>Bug reporting, now with real accounts.</h1>
+        <p class="eyebrow">Atlas bug reporter</p>
+        <h1>Welcome to Atlas bug reporter</h1>
         <p class="lede">
-          Beta testers can create an account, sign in, file structured bug reports,
-          and reset their password by email without needing you to do it manually.
+          Sign in to send clean bug reports, keep feedback organized, and pick up
+          where you left off.
         </p>
-
-        <div class="feature-stack">
-          <article class="feature-card">
-            <h2>Built for triage</h2>
-            <p>
-              Reports capture severity, reproduction steps, affected URLs, and recent
-              submission history.
-            </p>
-          </article>
-
-          <article class="feature-card">
-            <h2>Account-backed access</h2>
-            <p>
-              Email and password accounts protect the reporting flow while keeping the
-              experience lightweight.
-            </p>
-          </article>
-
-          <article class="feature-card">
-            <h2>Password resets by email</h2>
-            <p>
-              When a tester gets locked out, they can recover access from the landing
-              page instead of pinging you.
-            </p>
-          </article>
-        </div>
+        <p class="hero-note">
+          Use the panel to log in, create an account, or recover access.
+        </p>
       </section>
 
       <section class="auth-card">
         <div id="session-cta" class="session-cta hidden">
           <p>You’re already signed in.</p>
-          <a class="button-link" href="/dashboard">Open bug dashboard</a>
+          <a class="button-link button-link--secondary" href="/dashboard">
+            Open bug dashboard
+          </a>
         </div>
 
         <div class="auth-tabs" role="tablist" aria-label="Authentication options">
@@ -68,7 +47,7 @@
 
         <section class="auth-panel" data-panel="login">
           <h2>Sign in</h2>
-          <p class="panel-copy">Use the email and password you created for beta access.</p>
+          <p class="panel-copy">Use the tester account tied to your Atlas access.</p>
 
           <form id="login-form" novalidate>
             <label class="field">
@@ -94,8 +73,7 @@
         <section class="auth-panel hidden" data-panel="register">
           <h2>Create account</h2>
           <p class="panel-copy">
-            Self-serve registration is enabled for beta testers. You can sign in right
-            after creating your account.
+            Create a tester account and you can start reporting right away.
           </p>
 
           <form id="register-form" novalidate>
@@ -123,7 +101,7 @@
         <section class="auth-panel hidden" data-panel="forgot">
           <h2>Reset password</h2>
           <p class="panel-copy">
-            Enter your account email and we’ll send a password reset link if it exists.
+            Enter your account email and we’ll send a reset link if it exists.
           </p>
 
           <form id="forgot-form" novalidate>

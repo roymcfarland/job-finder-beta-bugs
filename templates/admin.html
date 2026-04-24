@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin Dashboard</title>
+    <title>Atlas Admin</title>
     <meta
       name="description"
-      content="Admin tools for JobFinder.guru beta bug reporting."
+      content="Admin tools for Atlas bug reporting."
     />
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/admin.js" defer></script>
@@ -15,7 +15,7 @@
     <main class="site-shell">
       <header class="dashboard-header">
         <div>
-          <p class="eyebrow">JobFinder.guru beta admin</p>
+          <p class="eyebrow">Atlas admin</p>
           <h1 class="dashboard-title">Admin dashboard</h1>
           <p class="dashboard-subtitle">
             Signed in as <strong id="admin-email">loading...</strong>
@@ -55,8 +55,8 @@
         <section class="panel panel--sidebar">
           <h2>User accounts</h2>
           <p class="panel-copy">
-            Disable access instantly. Disabled users lose active sessions and can’t sign
-            back in until re-enabled.
+            Disable access instantly. Disabled users lose active sessions and stay out
+            until re-enabled.
           </p>
 
           <div id="admin-users" class="admin-user-list empty-state">
@@ -69,7 +69,7 @@
             <div>
               <h2>User comments</h2>
               <p class="panel-copy">
-                Filter by user and status, then resolve or reopen comments on the fly.
+                Filter by user and status, then resolve or reopen comments inline.
               </p>
             </div>
           </div>

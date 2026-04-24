@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bug Dashboard</title>
+    <title>Atlas Bug Dashboard</title>
     <meta
       name="description"
-      content="Submit bug reports for JobFinder.guru beta."
+      content="Submit bug reports for Atlas."
     />
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/dashboard.js" defer></script>
@@ -15,7 +15,7 @@
     <main class="site-shell">
       <header class="dashboard-header">
         <div>
-          <p class="eyebrow">JobFinder.guru beta</p>
+          <p class="eyebrow">Atlas bug reporter</p>
           <h1 class="dashboard-title">Bug report dashboard</h1>
           <p class="dashboard-subtitle">
             Signed in as <strong id="session-email">loading...</strong>
@@ -41,8 +41,8 @@
         <section class="panel">
           <h2>Send a bug report</h2>
           <p class="panel-copy">
-            The account email is attached automatically, so focus on what broke and how
-            to reproduce it.
+            Your account is attached automatically, so focus on what broke and how to
+            reproduce it.
           </p>
 
           <form id="bug-report-form" novalidate>
@@ -174,8 +174,8 @@
         <aside class="panel panel--sidebar">
           <h2>Recent reports</h2>
           <p class="panel-copy">
-            Your last few submissions appear here once they’re stored. Resolved reports
-            are shadowed out automatically.
+            Your latest submissions appear here after they are stored. Resolved reports
+            fade back automatically.
           </p>
           <div id="recent-reports" class="report-list empty-state">
             No reports yet.
