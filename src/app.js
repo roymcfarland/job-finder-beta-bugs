@@ -23,6 +23,7 @@ import {
 import { getErrorContext } from "./logger.js";
 import { createNotificationService } from "./notifications.js";
 import { createRateLimitStore } from "./rateLimitStore.js";
+import { renderSocialMeta } from "./socialMeta.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(currentDir, "..", "public");
@@ -149,11 +150,11 @@ export function createApp(options = {}) {
     }
 
     if (pathname === "/") {
-      return serveTemplate("landing.html", method);
+      return serveTemplate("landing.html", method, config);
     }
 
     if (pathname === "/reset-password") {
-      return serveTemplate("reset-password.html", method);
+      return serveTemplate("reset-password.html", method, config);
     }
 
     if (pathname === "/dashboard") {
@@ -166,7 +167,7 @@ export function createApp(options = {}) {
         });
       }
 
-      return serveTemplate("dashboard.html", method);
+      return serveTemplate("dashboard.html", method, config);
     }
 
     if (pathname === "/admin") {
@@ -186,7 +187,7 @@ export function createApp(options = {}) {
         });
       }
 
-      return serveTemplate("admin.html", method);
+      return serveTemplate("admin.html", method, config);
     }
 
     return serveStaticAsset(pathname, method);
@@ -228,8 +229,12 @@ export function createApp(options = {}) {
   }
 }
 
-async function serveTemplate(fileName, method) {
-  const html = await loadTemplate(fileName);
+async function serveTemplate(fileName, method, config) {
+  const html = renderSocialMeta(
+    await loadTemplate(fileName),
+    fileName,
+    config.baseUrl,
+  );
 
   return {
     status: 200,

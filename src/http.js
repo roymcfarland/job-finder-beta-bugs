@@ -90,6 +90,22 @@ export function getMimeType(filePath) {
     return "image/svg+xml";
   }
 
+  if (filePath.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+
+  if (filePath.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (filePath.endsWith(".ico")) {
+    return "image/x-icon";
+  }
+
   return "application/octet-stream";
 }
 

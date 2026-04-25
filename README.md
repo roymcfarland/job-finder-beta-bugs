@@ -10,6 +10,7 @@ It now includes:
 - An admin comment dashboard with resolve/reopen toggles and filters
 - A public landing page with login, sign-up, and reset flows
 - A protected bug-report dashboard behind session cookies
+- Open Graph and Twitter card previews for polished link sharing
 - Postgres-backed storage for users, sessions, reset tokens, and bug reports
 - Optional bug-report notifications through Resend or a webhook
 
@@ -76,6 +77,9 @@ Optional:
 - Attach a Postgres integration or set `DATABASE_URL` manually
 - Add `RESEND_API_KEY`, `EMAIL_FROM`, and `APP_BASE_URL`
 - Deploy
+
+`APP_BASE_URL` is also used for canonical URLs and social preview images, so set
+it to the public production origin before sharing links.
 
 ## Notes
 
