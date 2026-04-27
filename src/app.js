@@ -36,6 +36,16 @@ const renderedTemplateCache = new Map();
 export function createApp(options = {}) {
   const config = options.config ?? getConfig();
   const logger = options.logger ?? console;
+
+  // Loud warning rather than silent demotion: when the admin list is unset
+  // synchronizeAdminRole leaves existing roles alone, so any account that
+  // was already admin will keep admin access. Operators still need to know
+  // because creating new admins requires this var to be configured.
+  if (config.environment === "production" && config.adminEmails.length === 0) {
+    logger.warn(
+      "ADMIN_EMAILS is not configured; existing admin roles are preserved but new admins cannot be added.",
+    );
+  }
   const notifications =
     options.notifications ?? createNotificationService(config, options);
   const authService =

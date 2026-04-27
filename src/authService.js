@@ -587,16 +587,26 @@ function isLikelyEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 }
 
-// Source of truth for who counts as an admin is the ADMIN_EMAILS env list.
-// This intentionally returns "user" when an existing admin is removed from
-// the list, so demotions take effect on the next login or session refresh.
+// Source of truth for who counts as an admin is the ADMIN_EMAILS env list,
+// but only when that list is actually configured. A non-empty list returns
+// "admin" for matching emails and "user" for everyone else, so removing an
+// email demotes that account on next login or session refresh. Callers must
+// check config.adminEmails.length first; this helper assumes the list is set.
 function getRoleForEmail(config, email) {
   return config.adminEmails.includes(normalizeEmail(email)) ? "admin" : "user";
 }
 
 async function synchronizeAdminRole({ config, userId, email, currentRole }) {
-  const desiredRole = getRoleForEmail(config, email);
   const normalizedCurrent = currentRole || "user";
+
+  // Treat an unset/empty ADMIN_EMAILS as "not configured" rather than
+  // "demote everyone". Otherwise a missing env var on a fresh deploy or a
+  // bad pull would silently strip admin from every account on next request.
+  if (config.adminEmails.length === 0) {
+    return normalizedCurrent;
+  }
+
+  const desiredRole = getRoleForEmail(config, email);
 
   if (desiredRole === normalizedCurrent) {
     return normalizedCurrent;

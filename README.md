@@ -59,7 +59,8 @@ Optional:
 
 ## Admin behavior
 
-- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account. Removing an email from the list demotes that account on next login or session refresh, and sibling sessions are dropped at that point.
+- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account. Removing an email from a configured list demotes that account on next login or session refresh, and sibling sessions are dropped at that point.
+- An unset or empty `ADMIN_EMAILS` is treated as "not configured": existing admin roles in the database are preserved, no demotion runs, and a startup warning is logged in production. Set the variable to enable promotion/demotion via the env list.
 - Admins can disable or re-enable user accounts.
 - Disabled users lose active sessions immediately and cannot sign in again until re-enabled.
 - Admins can filter user comments by reporter and by resolved/unresolved state.
