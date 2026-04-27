@@ -37,7 +37,7 @@ async function loadSession() {
 
   if (response.status === 401) {
     window.location.assign("/");
-    throw new Error("Unauthorized");
+    return new Promise(() => {});
   }
 
   if (!response.ok) {

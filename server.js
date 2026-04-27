@@ -18,7 +18,9 @@ const host =
 
 server.on("error", (error) => {
   logger.error("Server failed to start.", getErrorContext(error));
-  process.exitCode = 1;
+  // Force exit so a bind failure (port in use, permission denied, etc.) can't
+  // leave the process alive but unreachable once we add other async handles.
+  process.exit(1);
 });
 
 server.listen(port, host, () => {

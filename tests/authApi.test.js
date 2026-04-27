@@ -330,6 +330,112 @@ test("POST /api/auth/login throttles repeated failures for the same account", as
   assert.equal(result.headers["retry-after"], "60");
 });
 
+test("POST /api/auth/logout rejects requests from an unrecognized origin", async () => {
+  let logoutCalls = 0;
+  const api = createAuthApi({
+    config: getConfig({
+      NODE_ENV: "test",
+      APP_BASE_URL: "https://bugs.example.com",
+    }),
+    rateLimiter: createAllowedRateLimiter(),
+    authService: {
+      validateRegistrationInput() {
+        return {};
+      },
+      validateLoginInput() {
+        return {};
+      },
+      validateResetInput() {
+        return { password: "" };
+      },
+      normalizeEmail(value) {
+        return String(value).toLowerCase();
+      },
+      async register() {
+        return null;
+      },
+      async login() {
+        return null;
+      },
+      async getSessionFromCookie() {
+        return { token: "session_token", user: { id: "user_1", email: "beta@example.com" } };
+      },
+      async logout() {
+        logoutCalls += 1;
+      },
+      async requestPasswordReset() {},
+      async resetPassword() {},
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/auth/logout",
+    method: "POST",
+    origin: "https://attacker.example",
+    ip: "127.0.0.1",
+    userAgent: "Mozilla/5.0",
+    contentType: "application/json",
+    cookieHeader: "jobfinder_session=session_token",
+    rawBody: "",
+  });
+
+  assert.equal(result.status, 403);
+  assert.equal(logoutCalls, 0);
+});
+
+test("POST /api/auth/logout accepts requests with a matching origin", async () => {
+  let logoutCalls = 0;
+  const api = createAuthApi({
+    config: getConfig({
+      NODE_ENV: "test",
+      APP_BASE_URL: "https://bugs.example.com",
+    }),
+    rateLimiter: createAllowedRateLimiter(),
+    authService: {
+      validateRegistrationInput() {
+        return {};
+      },
+      validateLoginInput() {
+        return {};
+      },
+      validateResetInput() {
+        return { password: "" };
+      },
+      normalizeEmail(value) {
+        return String(value).toLowerCase();
+      },
+      async register() {
+        return null;
+      },
+      async login() {
+        return null;
+      },
+      async getSessionFromCookie() {
+        return { token: "session_token", user: { id: "user_1", email: "beta@example.com" } };
+      },
+      async logout() {
+        logoutCalls += 1;
+      },
+      async requestPasswordReset() {},
+      async resetPassword() {},
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/auth/logout",
+    method: "POST",
+    origin: "https://bugs.example.com",
+    ip: "127.0.0.1",
+    userAgent: "Mozilla/5.0",
+    contentType: "application/json",
+    cookieHeader: "jobfinder_session=session_token",
+    rawBody: "",
+  });
+
+  assert.equal(result.status, 204);
+  assert.equal(logoutCalls, 1);
+});
+
 test("POST /api/auth/login rejects non-JSON content types", async () => {
   const api = createAuthApi({
     config: getConfig({ NODE_ENV: "test" }),

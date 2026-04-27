@@ -39,7 +39,12 @@ export function buildBugReportSubmission(payload, context = {}) {
   const fieldErrors = {};
 
   const name = normalizeText(payload.name, FIELD_LIMITS.name);
-  const email = normalizeText(payload.email, FIELD_LIMITS.email);
+  // When the caller will overwrite the reporter email from the session
+  // (skipReporterEmail), we ignore whatever the client sent so a stale value
+  // can't trigger a 400 even though the value never gets used.
+  const email = context.skipReporterEmail
+    ? ""
+    : normalizeText(payload.email, FIELD_LIMITS.email);
   const summary = normalizeText(payload.summary, FIELD_LIMITS.summary);
   const affectedUrl = normalizeText(payload.affectedUrl, FIELD_LIMITS.affectedUrl);
   const category = normalizeChoice(payload.category);
@@ -77,7 +82,7 @@ export function buildBugReportSubmission(payload, context = {}) {
     fieldErrors.reproduceSteps = "Add the steps so I can reproduce the issue.";
   }
 
-  if (email && !EMAIL_PATTERN.test(email)) {
+  if (!context.skipReporterEmail && email && !EMAIL_PATTERN.test(email)) {
     fieldErrors.email = "Enter a valid email address or leave it blank.";
   }
 

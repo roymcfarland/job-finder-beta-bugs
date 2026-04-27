@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,6 +29,9 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(currentDir, "..", "public");
 const templatesDir = path.join(currentDir, "..", "templates");
 const templateCache = new Map();
+// Caches the rendered HTML (template + social meta) keyed by `${fileName}|${baseUrl}`
+// so we don't re-run the meta builder on every page load.
+const renderedTemplateCache = new Map();
 
 export function createApp(options = {}) {
   const config = options.config ?? getConfig();
@@ -233,11 +236,7 @@ export function createApp(options = {}) {
 }
 
 async function serveTemplate(fileName, method, config) {
-  const html = renderSocialMeta(
-    await loadTemplate(fileName),
-    fileName,
-    config.baseUrl,
-  );
+  const html = await getRenderedTemplate(fileName, config.baseUrl);
 
   return {
     status: 200,
@@ -248,6 +247,18 @@ async function serveTemplate(fileName, method, config) {
     },
     body: method === "HEAD" ? null : html,
   };
+}
+
+async function getRenderedTemplate(fileName, baseUrl) {
+  const cacheKey = `${fileName}|${baseUrl}`;
+  const cached = renderedTemplateCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const html = renderSocialMeta(await loadTemplate(fileName), fileName, baseUrl);
+  renderedTemplateCache.set(cacheKey, html);
+  return html;
 }
 
 async function serveStaticAsset(pathname, method) {
@@ -262,7 +273,6 @@ async function serveStaticAsset(pathname, method) {
   }
 
   try {
-    await access(filePath);
     const fileContents = await readFile(filePath);
 
     return {
@@ -274,7 +284,11 @@ async function serveStaticAsset(pathname, method) {
       },
       body: method === "HEAD" ? null : fileContents,
     };
-  } catch {
+  } catch (error) {
+    if (error?.code !== "ENOENT" && error?.code !== "EISDIR") {
+      throw error;
+    }
+
     return {
       status: 404,
       headers: getSecurityHeaders(),

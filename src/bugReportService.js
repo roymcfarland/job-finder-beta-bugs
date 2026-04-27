@@ -21,6 +21,7 @@ export function createBugReportService(options = {}) {
       const report = buildBugReportSubmission(payload, {
         now: now(),
         userAgent,
+        skipReporterEmail: true,
       });
 
       report.reporter.email = user.email;
@@ -78,6 +79,9 @@ export function createBugReportService(options = {}) {
         throw error;
       }
 
+      // "stored-only"  -> notifications intentionally unconfigured
+      // "notify-failed" -> configured target rejected the delivery
+      // delivery.mode   -> "resend" | "webhook" | "console" on success
       let notificationMode = "stored-only";
 
       if (notifications) {
@@ -89,6 +93,7 @@ export function createBugReportService(options = {}) {
 
           notificationMode = delivery.mode === "disabled" ? "stored-only" : delivery.mode;
         } catch (error) {
+          notificationMode = "notify-failed";
           logWarning(logger, "Bug report notification failed.", error);
         }
       }

@@ -33,6 +33,8 @@ The app auto-loads `.env` and `.env.local` in local development.
 - `npm start` starts the production-style Node server
 - `npm run dev` starts the app with `node --watch`
 - `npm test` runs the built-in Node tests
+- `npm run migrate` applies database migrations off the request hot path (safe to run during deploy)
+- `npm run cleanup` deletes expired sessions and used/expired password-reset tokens
 
 ## Environment variables
 
@@ -57,7 +59,7 @@ Optional:
 
 ## Admin behavior
 
-- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account.
+- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account. Removing an email from the list demotes that account on next login or session refresh, and sibling sessions are dropped at that point.
 - Admins can disable or re-enable user accounts.
 - Disabled users lose active sessions immediately and cannot sign in again until re-enabled.
 - Admins can filter user comments by reporter and by resolved/unresolved state.

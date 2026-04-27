@@ -76,6 +76,13 @@ export function createAuthApi(options) {
           return methodNotAllowedResponse(headers, "POST, OPTIONS");
         }
 
+        // Defense in depth against logout CSRF. SameSite=Lax already blocks
+        // the cookie on cross-site form posts, but rejecting mismatched
+        // Origin headers makes the intent explicit.
+        if (!isSameOriginRequest(request, config)) {
+          return jsonResponse(403, { error: "Cross-origin logout is not allowed." }, headers);
+        }
+
         const { response, session } = await getSessionResult({
           authService,
           cookieHeader: request.cookieHeader,
@@ -408,4 +415,28 @@ function buildExpiredSessionCookie(config) {
 
 function hasFieldErrors(fieldErrors) {
   return Object.values(fieldErrors).some(Boolean);
+}
+
+function isSameOriginRequest(request, config) {
+  const origin = typeof request.origin === "string" ? request.origin.trim() : "";
+
+  // Browsers omit Origin on most same-origin GETs but include it on POSTs.
+  // No header at all is treated as same-origin (e.g. tests, server-to-server).
+  if (!origin) {
+    return true;
+  }
+
+  if (config.allowedOrigin && origin === config.allowedOrigin) {
+    return true;
+  }
+
+  if (config.baseUrl && origin === stripTrailingSlash(config.baseUrl)) {
+    return true;
+  }
+
+  return false;
+}
+
+function stripTrailingSlash(value) {
+  return typeof value === "string" ? value.replace(/\/+$/, "") : value;
 }

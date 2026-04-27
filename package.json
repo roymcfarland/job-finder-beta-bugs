@@ -13,6 +13,8 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "migrate": "node scripts/migrate.js",
+    "cleanup": "node scripts/cleanup.js"
   }
 }

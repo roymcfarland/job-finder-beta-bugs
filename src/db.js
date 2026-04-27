@@ -9,6 +9,11 @@ export class DatabaseNotConfiguredError extends Error {
   }
 }
 
+// Arbitrary 64-bit constant used as a Postgres advisory-lock key. Cold starts
+// across multiple instances will serialize on this lock so concurrent DDL
+// (during a deploy) can't deadlock on AccessExclusiveLock contention.
+const SCHEMA_LOCK_KEY = 7283749274n;
+
 const globalStore = globalThis.__jobfinderDbStore ?? {
   pool: null,
   connectionUrl: "",
@@ -60,7 +65,17 @@ export async function ensureDatabase(config) {
   const pool = getPool(config);
 
   if (!globalStore.schemaReady) {
-    globalStore.schemaReady = initializeSchema(pool);
+    // If schema init fails (transient DB error during cold start, ALTER
+    // contention during a deploy, etc.) we MUST clear the cached promise so
+    // the next request can retry. Otherwise every subsequent call would await
+    // the same rejected promise and 500 forever.
+    const inflight = initializeSchema(pool).catch((error) => {
+      if (globalStore.schemaReady === inflight) {
+        globalStore.schemaReady = null;
+      }
+      throw error;
+    });
+    globalStore.schemaReady = inflight;
   }
 
   await globalStore.schemaReady;
@@ -96,8 +111,52 @@ export async function withTransaction(config, work) {
   }
 }
 
+export async function cleanupExpiredSessions(config) {
+  const result = await query(
+    config,
+    `
+      DELETE FROM sessions
+      WHERE expires_at < NOW()
+    `,
+  );
+  return { deleted: result.rowCount ?? 0 };
+}
+
+export async function cleanupUsedResetTokens(config, { olderThanMs = 7 * 24 * 60 * 60 * 1000 } = {}) {
+  const result = await query(
+    config,
+    `
+      DELETE FROM password_reset_tokens
+      WHERE expires_at < NOW()
+         OR (used_at IS NOT NULL AND used_at < NOW() - ($1 || ' milliseconds')::interval)
+    `,
+    [String(olderThanMs)],
+  );
+  return { deleted: result.rowCount ?? 0 };
+}
+
 async function initializeSchema(pool) {
-  await pool.query(`
+  const client = await pool.connect();
+
+  try {
+    // Serialize DDL across concurrent processes (e.g. multiple Vercel cold
+    // starts during a deploy). The lock auto-releases when the session ends,
+    // but we release explicitly in the success path so the connection is
+    // reusable from the pool.
+    await client.query("SELECT pg_advisory_lock($1)", [SCHEMA_LOCK_KEY.toString()]);
+
+    try {
+      await runMigrations(client);
+    } finally {
+      await client.query("SELECT pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY.toString()]);
+    }
+  } finally {
+    client.release();
+  }
+}
+
+async function runMigrations(client) {
+  await client.query(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
@@ -107,22 +166,22 @@ async function initializeSchema(pool) {
     );
   `);
 
-  await pool.query(`
+  await client.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
   `);
 
-  await pool.query(`
+  await client.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ;
   `);
 
-  await pool.query(`
+  await client.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS disabled_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -135,7 +194,7 @@ async function initializeSchema(pool) {
     );
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -146,7 +205,7 @@ async function initializeSchema(pool) {
     );
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE TABLE IF NOT EXISTS bug_reports (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -167,36 +226,40 @@ async function initializeSchema(pool) {
     );
   `);
 
-  await pool.query(`
+  await client.query(`
     ALTER TABLE bug_reports
     ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
   `);
 
-  await pool.query(`
+  await client.query(`
     ALTER TABLE bug_reports
     ADD COLUMN IF NOT EXISTS resolved_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions(token_hash);
   `);
 
-  await pool.query(`
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
+  `);
+
+  await client.query(`
     CREATE INDEX IF NOT EXISTS password_reset_tokens_token_hash_idx
     ON password_reset_tokens(token_hash);
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE INDEX IF NOT EXISTS bug_reports_user_created_idx
     ON bug_reports(user_id, created_at DESC);
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE INDEX IF NOT EXISTS bug_reports_resolved_created_idx
     ON bug_reports(resolved_at, created_at DESC);
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE TABLE IF NOT EXISTS admin_audit_log (
       id TEXT PRIMARY KEY,
       admin_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -208,7 +271,7 @@ async function initializeSchema(pool) {
     );
   `);
 
-  await pool.query(`
+  await client.query(`
     CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx
     ON admin_audit_log(created_at DESC);
   `);

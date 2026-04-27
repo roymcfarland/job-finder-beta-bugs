@@ -41,7 +41,7 @@ async function loadSession() {
 
   if (response.status === 401) {
     window.location.assign("/");
-    throw new Error("Unauthorized");
+    return haltUntilNavigation();
   }
 
   const data = await response.json().catch(() => ({}));
@@ -52,10 +52,17 @@ async function loadSession() {
 
   if (data.user?.role !== "admin") {
     window.location.assign("/dashboard");
-    throw new Error("Forbidden");
+    return haltUntilNavigation();
   }
 
   return data;
+}
+
+// After window.location.assign the new page is loading; we don't want
+// initialize() to keep running and flash a misleading error toast in the
+// background, so we hand back a promise that never resolves.
+function haltUntilNavigation() {
+  return new Promise(() => {});
 }
 
 async function loadDashboard() {

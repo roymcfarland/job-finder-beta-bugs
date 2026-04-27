@@ -188,12 +188,13 @@ export function createAuthService(options = {}) {
         throw new AccountDisabledError();
       }
 
+      const previousRole = user.role;
       try {
         user.role = await synchronizeAdminRole({
           config,
           userId: user.id,
           email: user.email,
-          currentRole: user.role,
+          currentRole: previousRole,
         });
       } catch (error) {
         if (error instanceof DatabaseNotConfiguredError) {
@@ -201,6 +202,17 @@ export function createAuthService(options = {}) {
         }
 
         throw error;
+      }
+
+      if (previousRole === "admin" && user.role !== "admin") {
+        // Just demoted this user (email removed from ADMIN_EMAILS). Drop
+        // their other sessions so any already-open admin tabs lose access
+        // on the next request.
+        await query(
+          config,
+          `DELETE FROM sessions WHERE user_id = $1`,
+          [user.id],
+        );
       }
 
       const session = createSessionRecord(now(), config.session.ttlMs, ipAddress, userAgent);
@@ -286,12 +298,38 @@ export function createAuthService(options = {}) {
           return null;
         }
 
+        const previousRole = row.role || "user";
         const role = await synchronizeAdminRole({
           config,
           userId: row.user_id,
           email: row.email,
-          currentRole: row.role,
+          currentRole: previousRole,
         });
+
+        if (previousRole === "admin" && role !== "admin") {
+          // Demoted in real-time. Drop every session for this user including
+          // the current one so the admin UI can't keep working on stale
+          // permissions until logout.
+          await query(
+            config,
+            `DELETE FROM sessions WHERE user_id = $1`,
+            [row.user_id],
+          );
+          return null;
+        }
+
+        // Refresh last_seen_at at most every few minutes to avoid a write on
+        // every authenticated request. Rounded to keep this off the hot path.
+        await query(
+          config,
+          `
+            UPDATE sessions
+            SET last_seen_at = NOW()
+            WHERE id = $1
+              AND last_seen_at < NOW() - INTERVAL '5 minutes'
+          `,
+          [row.session_id],
+        );
 
         return {
           token,
@@ -549,15 +587,19 @@ function isLikelyEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 }
 
-function getRoleForEmail(config, email, currentRole = "user") {
-  return config.adminEmails.includes(normalizeEmail(email)) ? "admin" : currentRole || "user";
+// Source of truth for who counts as an admin is the ADMIN_EMAILS env list.
+// This intentionally returns "user" when an existing admin is removed from
+// the list, so demotions take effect on the next login or session refresh.
+function getRoleForEmail(config, email) {
+  return config.adminEmails.includes(normalizeEmail(email)) ? "admin" : "user";
 }
 
 async function synchronizeAdminRole({ config, userId, email, currentRole }) {
-  const desiredRole = getRoleForEmail(config, email, currentRole);
+  const desiredRole = getRoleForEmail(config, email);
+  const normalizedCurrent = currentRole || "user";
 
-  if (desiredRole === currentRole) {
-    return currentRole || "user";
+  if (desiredRole === normalizedCurrent) {
+    return normalizedCurrent;
   }
 
   await query(
