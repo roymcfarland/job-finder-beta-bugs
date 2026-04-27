@@ -130,7 +130,10 @@ export function createApp(options = {}) {
       origin: request.headers.origin,
       cookieHeader: request.headers.cookie,
       searchParams: url.searchParams,
-      ip: getClientIp(request.headers, request.socket.remoteAddress),
+      contentType: request.headers["content-type"],
+      ip: getClientIp(request.headers, request.socket.remoteAddress, {
+        trustProxy: config.trustProxy,
+      }),
       userAgent: request.headers["user-agent"],
     };
 

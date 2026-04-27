@@ -27,17 +27,32 @@ export function getPool(config) {
   if (!globalStore.pool || globalStore.connectionUrl !== connectionUrl) {
     globalStore.connectionUrl = connectionUrl;
     globalStore.schemaReady = null;
-    globalStore.pool = new Pool(createPoolOptions(connectionUrl));
+    globalStore.pool = new Pool(createPoolOptions(connectionUrl, config.database));
   }
 
   return globalStore.pool;
 }
 
-export function createPoolOptions(connectionUrl) {
+export function createPoolOptions(connectionUrl, databaseConfig = {}) {
+  if (!shouldUseSsl(connectionUrl)) {
+    return {
+      connectionString: connectionUrl,
+      max: 5,
+    };
+  }
+
+  const ssl = {
+    rejectUnauthorized: Boolean(databaseConfig.sslRejectUnauthorized),
+  };
+
+  if (databaseConfig.sslCa) {
+    ssl.ca = databaseConfig.sslCa;
+  }
+
   return {
     connectionString: normalizeConnectionUrl(connectionUrl),
     max: 5,
-    ssl: shouldUseSsl(connectionUrl) ? { rejectUnauthorized: false } : undefined,
+    ssl,
   };
 }
 
@@ -179,6 +194,23 @@ async function initializeSchema(pool) {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS bug_reports_resolved_created_idx
     ON bug_reports(resolved_at, created_at DESC);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id TEXT PRIMARY KEY,
+      admin_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      admin_email TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      target_id TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx
+    ON admin_audit_log(created_at DESC);
   `);
 }
 

@@ -4,6 +4,7 @@ import { BugReportConfigurationError } from "./bugReportService.js";
 import { getConfig } from "./config.js";
 import {
   buildApiHeaders,
+  isJsonContentType,
   jsonResponse,
   methodNotAllowedResponse,
   parseJsonObject,
@@ -72,6 +73,14 @@ export function createBugReportApi(options = {}) {
 
       if (request.method !== "POST") {
         return methodNotAllowedResponse(headers, "POST, OPTIONS");
+      }
+
+      if (!isJsonContentType(request.contentType)) {
+        return jsonResponse(
+          415,
+          { error: "Send requests with Content-Type: application/json." },
+          headers,
+        );
       }
 
       let payload;

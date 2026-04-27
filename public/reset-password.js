@@ -3,6 +3,18 @@ const statusPanel = document.querySelector("#reset-status");
 const resetButton = document.querySelector("#reset-button");
 const token = new URLSearchParams(window.location.search).get("token") || "";
 
+if (token) {
+  // Remove the token from the visible URL/history so it doesn't leak via the
+  // browser's address bar, the page Referer, or sync extensions.
+  try {
+    const cleaned = new URL(window.location.href);
+    cleaned.searchParams.delete("token");
+    window.history.replaceState(null, "", cleaned.toString());
+  } catch {
+    // History rewrite is best-effort; fall through silently.
+  }
+}
+
 initialize();
 
 form.addEventListener("submit", handleSubmit);

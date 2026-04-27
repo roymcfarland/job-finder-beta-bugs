@@ -62,6 +62,7 @@ Optional:
 - Disabled users lose active sessions immediately and cannot sign in again until re-enabled.
 - Admins can filter user comments by reporter and by resolved/unresolved state.
 - Comment resolution is a live toggle, so resolved comments can be reopened without reloading the page.
+- Disable/enable and resolve/reopen actions are recorded in the `admin_audit_log` table and exposed via `GET /api/admin/audit-log`.
 
 ## Deployment
 

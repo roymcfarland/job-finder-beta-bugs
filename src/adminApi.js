@@ -7,6 +7,7 @@ import {
 import { getSessionResult } from "./apiSession.js";
 import {
   buildApiHeaders,
+  isJsonContentType,
   jsonResponse,
   methodNotAllowedResponse,
   parseJsonObject,
@@ -68,9 +69,29 @@ export function createAdminApi(options) {
           return jsonResponse(200, { comments }, headers);
         }
 
+        if (request.pathname === "/api/admin/audit-log") {
+          if (request.method !== "GET") {
+            return methodNotAllowedResponse(headers, "GET, OPTIONS");
+          }
+
+          const entries = await adminService.listAuditLog({
+            limit: request.searchParams.get("limit"),
+          });
+
+          return jsonResponse(200, { entries }, headers);
+        }
+
         if (request.pathname === "/api/admin/comments/status") {
           if (request.method !== "POST") {
             return methodNotAllowedResponse(headers, "POST, OPTIONS");
+          }
+
+          if (!isJsonContentType(request.contentType)) {
+            return jsonResponse(
+              415,
+              { error: "Send requests with Content-Type: application/json." },
+              headers,
+            );
           }
 
           let payload;
@@ -96,6 +117,14 @@ export function createAdminApi(options) {
         if (request.pathname === "/api/admin/users/status") {
           if (request.method !== "POST") {
             return methodNotAllowedResponse(headers, "POST, OPTIONS");
+          }
+
+          if (!isJsonContentType(request.contentType)) {
+            return jsonResponse(
+              415,
+              { error: "Send requests with Content-Type: application/json." },
+              headers,
+            );
           }
 
           let payload;

@@ -28,3 +28,13 @@ test("createPoolOptions leaves local database URLs untouched", () => {
   assert.equal(options.ssl, undefined);
   assert.equal(options.max, 5);
 });
+
+test("createPoolOptions enforces TLS verification when configured", () => {
+  const options = createPoolOptions(
+    "postgres://user:password@db.example.com:5432/postgres",
+    { sslRejectUnauthorized: true, sslCa: "-----BEGIN CERTIFICATE-----" },
+  );
+
+  assert.equal(options.ssl.rejectUnauthorized, true);
+  assert.equal(options.ssl.ca, "-----BEGIN CERTIFICATE-----");
+});

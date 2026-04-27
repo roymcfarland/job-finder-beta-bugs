@@ -145,6 +145,7 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
     pathname: "/api/admin/users/status",
     method: "POST",
     origin: undefined,
+    contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: JSON.stringify({
       userId: "user_2",
@@ -156,6 +157,57 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
   assert.equal(result.status, 200);
   const body = JSON.parse(result.body);
   assert.equal(body.user.isDisabled, true);
+});
+
+test("GET /api/admin/audit-log returns entries for admins", async () => {
+  const api = createAdminApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    authService: {
+      async getSessionFromCookie() {
+        return createAdminSession();
+      },
+    },
+    adminService: {
+      async getDashboardData() {
+        return {};
+      },
+      async listComments() {
+        return [];
+      },
+      async setCommentResolved() {
+        return {};
+      },
+      async setUserDisabled() {
+        return {};
+      },
+      async listAuditLog({ limit }) {
+        assert.equal(limit, "25");
+        return [
+          {
+            id: "audit_1",
+            adminEmail: "owner@example.com",
+            action: "user.disabled",
+            targetId: "user_2",
+            metadata: { targetEmail: "beta@example.com" },
+            createdAt: "2026-04-25T12:00:00.000Z",
+          },
+        ];
+      },
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/admin/audit-log",
+    method: "GET",
+    origin: undefined,
+    cookieHeader: "session=t",
+    rawBody: "",
+    searchParams: new URLSearchParams({ limit: "25" }),
+  });
+
+  assert.equal(result.status, 200);
+  const body = JSON.parse(result.body);
+  assert.equal(body.entries[0].action, "user.disabled");
 });
 
 test("POST /api/admin/users/status rejects non-boolean action values", async () => {
@@ -188,6 +240,7 @@ test("POST /api/admin/users/status rejects non-boolean action values", async () 
     pathname: "/api/admin/users/status",
     method: "POST",
     origin: undefined,
+    contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: JSON.stringify({
       userId: "user_2",

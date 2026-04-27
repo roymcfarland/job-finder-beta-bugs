@@ -9,14 +9,28 @@ import { getSessionResult } from "./apiSession.js";
 import { EmailDeliveryUnavailableError } from "./notifications.js";
 import {
   buildApiHeaders,
+  isJsonContentType,
   jsonResponse,
   methodNotAllowedResponse,
   parseJsonObject,
   serializeCookie,
 } from "./http.js";
+import { createRateLimitStore } from "./rateLimitStore.js";
+
+function createDefaultAccountRateLimiter(config) {
+  // Per-account login throttle. Tighter than the per-IP limiter so a single
+  // account can't be brute-forced from many IPs.
+  return createRateLimitStore({
+    limit: Math.max(5, Math.ceil(config.authRateLimitMax / 2)),
+    windowMs: config.authRateLimitWindowMs,
+  });
+}
 
 export function createAuthApi(options) {
   const { config, authService, rateLimiter } = options;
+  const accountRateLimiter =
+    options.accountRateLimiter ??
+    createDefaultAccountRateLimiter(config);
 
   return {
     async handle(request) {
@@ -89,6 +103,14 @@ export function createAuthApi(options) {
         return methodNotAllowedResponse(headers, "POST, OPTIONS");
       }
 
+      if (!isJsonContentType(request.contentType)) {
+        return jsonResponse(
+          415,
+          { error: "Send requests with Content-Type: application/json." },
+          headers,
+        );
+      }
+
       const limitResult = rateLimiter.consume(request.ip || "unknown", Date.now());
       if (!limitResult.allowed) {
         return jsonResponse(
@@ -114,7 +136,14 @@ export function createAuthApi(options) {
       }
 
       if (request.pathname === "/api/auth/login") {
-        return handleLogin({ authService, config, headers, payload, request });
+        return handleLogin({
+          authService,
+          config,
+          headers,
+          payload,
+          request,
+          accountRateLimiter,
+        });
       }
 
       if (request.pathname === "/api/auth/request-password-reset") {
@@ -178,7 +207,14 @@ async function handleRegistration({ authService, config, headers, payload, reque
   }
 }
 
-async function handleLogin({ authService, config, headers, payload, request }) {
+async function handleLogin({
+  authService,
+  config,
+  headers,
+  payload,
+  request,
+  accountRateLimiter,
+}) {
   const fieldErrors = authService.validateLoginInput({
     email: payload.email,
     password: payload.password,
@@ -190,6 +226,21 @@ async function handleLogin({ authService, config, headers, payload, request }) {
       { error: "Please review the highlighted fields and try again.", fieldErrors },
       headers,
     );
+  }
+
+  const accountKey = authService.normalizeEmail(payload.email);
+  if (accountKey) {
+    const accountLimit = accountRateLimiter.consume(`login:${accountKey}`, Date.now());
+    if (!accountLimit.allowed) {
+      return jsonResponse(
+        429,
+        { error: "Too many login attempts for this account. Try again later." },
+        {
+          ...headers,
+          "retry-after": String(accountLimit.retryAfterSeconds),
+        },
+      );
+    }
   }
 
   try {

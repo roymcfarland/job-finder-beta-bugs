@@ -8,6 +8,17 @@ import { EmailDeliveryUnavailableError } from "./notifications.js";
 import { hashPassword, validatePassword, verifyPassword } from "./passwords.js";
 import { createOpaqueToken, hashToken } from "./tokens.js";
 
+// Lazily computed scrypt hash for a throwaway password. We verify the supplied
+// password against this when the email isn't found so login latency doesn't
+// reveal whether an account exists.
+let timingDecoyHashPromise = null;
+function getTimingDecoyHash() {
+  if (!timingDecoyHashPromise) {
+    timingDecoyHashPromise = hashPassword(crypto.randomBytes(24).toString("base64url"));
+  }
+  return timingDecoyHashPromise;
+}
+
 export class DuplicateEmailError extends Error {
   constructor() {
     super("An account with that email already exists.");
@@ -161,7 +172,15 @@ export function createAuthService(options = {}) {
         throw error;
       }
 
-      if (!user || !(await verifyPassword(password, user.password_hash))) {
+      if (!user) {
+        // Run a real scrypt verification against a decoy hash so the response
+        // time matches the "wrong password" path and doesn't leak account
+        // existence.
+        await verifyPassword(typeof password === "string" ? password : "", await getTimingDecoyHash());
+        throw new InvalidCredentialsError();
+      }
+
+      if (!(await verifyPassword(password, user.password_hash))) {
         throw new InvalidCredentialsError();
       }
 

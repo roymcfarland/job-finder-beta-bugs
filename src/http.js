@@ -12,19 +12,21 @@ export class InvalidJsonError extends Error {
   }
 }
 
-export function getClientIp(headers, fallback = "") {
-  const forwardedFor = headers["x-forwarded-for"];
+export function getClientIp(headers, fallback = "", { trustProxy = false } = {}) {
+  if (trustProxy) {
+    const forwardedFor = headers["x-forwarded-for"];
 
-  if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
-    return forwardedFor.split(",")[0].trim();
+    if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
+      return forwardedFor.split(",")[0].trim().slice(0, 120);
+    }
+
+    const realIp = headers["x-real-ip"];
+    if (typeof realIp === "string" && realIp.length > 0) {
+      return realIp.trim().slice(0, 120);
+    }
   }
 
-  const realIp = headers["x-real-ip"];
-  if (typeof realIp === "string" && realIp.length > 0) {
-    return realIp.trim();
-  }
-
-  return fallback || "unknown";
+  return (fallback || "unknown").slice(0, 120);
 }
 
 export async function readRequestBody(request, maxBytes = 64 * 1024) {
@@ -59,14 +61,27 @@ export function sendNodeResponse(response, result) {
   response.end(result.body);
 }
 
-export function getSecurityHeaders() {
-  return {
+export function getSecurityHeaders(options = {}) {
+  const environment =
+    options.environment ?? process.env.NODE_ENV?.trim().toLowerCase() ?? "development";
+  const headers = {
     "content-security-policy":
-      "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'",
+      "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; manifest-src 'self'",
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
+    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-resource-policy": "same-origin",
+    "permissions-policy":
+      "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()",
   };
+
+  if (environment === "production") {
+    headers["strict-transport-security"] =
+      "max-age=63072000; includeSubDomains; preload";
+  }
+
+  return headers;
 }
 
 export function getMimeType(filePath) {
@@ -114,13 +129,29 @@ export function parseJsonObject(rawBody) {
     throw new InvalidJsonError();
   }
 
-  const parsed = JSON.parse(rawBody);
+  let parsed;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    throw new InvalidJsonError();
+  }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new InvalidJsonError();
   }
 
   return parsed;
+}
+
+export function isJsonContentType(contentType) {
+  if (typeof contentType !== "string") {
+    return false;
+  }
+
+  // Accept application/json with optional parameters (charset, etc.) and the
+  // less common application/*+json variant.
+  const mediaType = contentType.split(";")[0].trim().toLowerCase();
+  return mediaType === "application/json" || /\+json$/.test(mediaType);
 }
 
 export function jsonResponse(status, payload, headers = {}) {
@@ -156,18 +187,20 @@ export function methodNotAllowedResponse(headers, allow) {
   );
 }
 
-export function buildApiHeaders(allowedOrigin, requestOrigin) {
-  const corsHeaders =
-    allowedOrigin && requestOrigin === allowedOrigin
-      ? {
-          "access-control-allow-origin": allowedOrigin,
-          "access-control-allow-headers": "content-type",
-          "access-control-allow-methods": "GET, POST, OPTIONS",
-        }
-      : {};
+export function buildApiHeaders(allowedOrigin, requestOrigin, options = {}) {
+  const isAllowed = allowedOrigin && requestOrigin === allowedOrigin;
+  const corsHeaders = isAllowed
+    ? {
+        "access-control-allow-origin": allowedOrigin,
+        "access-control-allow-headers": "content-type",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-credentials": "true",
+        vary: "Origin",
+      }
+    : {};
 
   return {
-    ...getSecurityHeaders(),
+    ...getSecurityHeaders(options),
     ...corsHeaders,
     "cache-control": "no-store",
   };
@@ -201,9 +234,18 @@ export function parseCookies(cookieHeader = "") {
 }
 
 export function serializeCookie(name, value, options = {}) {
-  const parts = [`${name}=${encodeURIComponent(value)}`];
+  // `__Host-` prefixed cookies require Secure, Path=/, and no Domain. If the
+  // caller forgot the Secure flag, force it on so we never emit an invalid
+  // cookie that browsers will silently drop.
+  const requiresHostPrefix = typeof name === "string" && name.startsWith("__Host-");
+  const path = options.path ?? "/";
 
-  parts.push(`Path=${options.path ?? "/"}`);
+  if (requiresHostPrefix && path !== "/") {
+    throw new Error("__Host- cookies must be set with Path=/");
+  }
+
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+  parts.push(`Path=${path}`);
 
   if (options.httpOnly !== false) {
     parts.push("HttpOnly");
@@ -213,7 +255,7 @@ export function serializeCookie(name, value, options = {}) {
     parts.push(`SameSite=${options.sameSite}`);
   }
 
-  if (options.secure) {
+  if (options.secure || requiresHostPrefix) {
     parts.push("Secure");
   }
 

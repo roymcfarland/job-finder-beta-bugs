@@ -60,6 +60,7 @@ test("POST /api/report requires authentication", async () => {
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "",
     rawBody: buildPayload(),
   });
@@ -102,6 +103,7 @@ test("POST /api/report returns success for a valid authenticated report", async 
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: buildPayload(),
   });
@@ -146,6 +148,7 @@ test("POST /api/report returns field errors from validation failures", async () 
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: buildPayload(),
   });

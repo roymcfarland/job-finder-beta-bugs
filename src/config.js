@@ -15,6 +15,7 @@ export function getConfig(env = process.env) {
     baseUrl: getBaseUrl(env),
     allowedOrigin: env.ALLOWED_ORIGIN?.trim() || "",
     adminEmails: parseEmailList(env.ADMIN_EMAILS),
+    trustProxy: parseBoolean(env.TRUST_PROXY, isLikelyVercel(env)),
     passwordMinLength: parsePositiveInteger(
       env.PASSWORD_MIN_LENGTH,
       DEFAULT_PASSWORD_MIN_LENGTH,
@@ -35,13 +36,24 @@ export function getConfig(env = process.env) {
       env.RATE_LIMIT_WINDOW_MS,
       DEFAULT_REPORT_LIMIT_WINDOW_MS,
     ),
-    session: {
-      cookieName: env.SESSION_COOKIE_NAME?.trim() || "jobfinder_session",
-      ttlMs: parsePositiveInteger(env.SESSION_TTL_MS, DEFAULT_SESSION_TTL_MS),
-      secureCookie:
+    session: (() => {
+      const secureCookie =
         environment === "production" &&
-        (env.SESSION_COOKIE_SECURE?.trim() ?? "true") !== "false",
-    },
+        (env.SESSION_COOKIE_SECURE?.trim() ?? "true") !== "false";
+
+      // The `__Host-` prefix tells browsers to enforce Secure + Path=/ + no
+      // Domain, which gives strong CSRF/cookie-injection protection. We can
+      // only use it when Secure is set, so fall back to a plain name in dev.
+      const defaultCookieName = secureCookie
+        ? "__Host-jobfinder_session"
+        : "jobfinder_session";
+
+      return {
+        cookieName: env.SESSION_COOKIE_NAME?.trim() || defaultCookieName,
+        ttlMs: parsePositiveInteger(env.SESSION_TTL_MS, DEFAULT_SESSION_TTL_MS),
+        secureCookie,
+      };
+    })(),
     passwordReset: {
       ttlMs: parsePositiveInteger(
         env.PASSWORD_RESET_TTL_MS,
@@ -56,6 +68,15 @@ export function getConfig(env = process.env) {
           env.POSTGRES_PRISMA_URL,
           env.POSTGRES_URL_NON_POOLING,
         ) || "",
+      // Hosted Postgres providers (Vercel/Neon/Supabase) often use pooled
+      // connection certs that fail strict verification, so we default to
+      // permissive TLS. Set DATABASE_SSL_REJECT_UNAUTHORIZED=true once you've
+      // pinned a CA bundle to enforce verification.
+      sslRejectUnauthorized: parseBoolean(
+        env.DATABASE_SSL_REJECT_UNAUTHORIZED,
+        false,
+      ),
+      sslCa: env.DATABASE_SSL_CA?.trim() || "",
     },
     email: {
       resendApiKey: env.RESEND_API_KEY?.trim() || "",
@@ -110,4 +131,29 @@ function parseEmailList(value) {
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBoolean(value, fallback) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
+function isLikelyVercel(env) {
+  return Boolean(
+    env.VERCEL ||
+      env.VERCEL_URL ||
+      env.VERCEL_ENV ||
+      env.VERCEL_PROJECT_PRODUCTION_URL,
+  );
 }

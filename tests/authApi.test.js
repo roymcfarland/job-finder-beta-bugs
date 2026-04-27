@@ -2,13 +2,25 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createAuthApi } from "../src/authApi.js";
-import { AccountDisabledError, AuthConfigurationError } from "../src/authService.js";
+import {
+  AccountDisabledError,
+  AuthConfigurationError,
+  InvalidCredentialsError,
+} from "../src/authService.js";
 import { getConfig } from "../src/config.js";
 
 function createAllowedRateLimiter() {
   return {
     consume() {
       return { allowed: true, retryAfterSeconds: 0 };
+    },
+  };
+}
+
+function createBlockingRateLimiter() {
+  return {
+    consume() {
+      return { allowed: false, retryAfterSeconds: 60 };
     },
   };
 }
@@ -52,6 +64,7 @@ test("POST /api/auth/register creates a session cookie on success", async () => 
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "",
     rawBody: JSON.stringify({
       email: "beta@example.com",
@@ -107,6 +120,7 @@ test("POST /api/auth/login returns field errors when input is invalid", async ()
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "",
     rawBody: JSON.stringify({
       email: "",
@@ -249,6 +263,7 @@ test("POST /api/auth/login returns a disabled-account error cleanly", async () =
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
+    contentType: "application/json",
     cookieHeader: "",
     rawBody: JSON.stringify({
       email: "beta@example.com",
@@ -259,4 +274,104 @@ test("POST /api/auth/login returns a disabled-account error cleanly", async () =
   assert.equal(result.status, 403);
   const body = JSON.parse(result.body);
   assert.match(body.error, /disabled/i);
+});
+
+test("POST /api/auth/login throttles repeated failures for the same account", async () => {
+  let loginCalls = 0;
+  const api = createAuthApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    rateLimiter: createAllowedRateLimiter(),
+    accountRateLimiter: createBlockingRateLimiter(),
+    authService: {
+      validateRegistrationInput() {
+        return {};
+      },
+      validateLoginInput() {
+        return {};
+      },
+      validateResetInput() {
+        return { password: "" };
+      },
+      normalizeEmail(value) {
+        return String(value).toLowerCase();
+      },
+      async register() {
+        return null;
+      },
+      async login() {
+        loginCalls += 1;
+        throw new InvalidCredentialsError();
+      },
+      async getSessionFromCookie() {
+        return null;
+      },
+      async logout() {},
+      async requestPasswordReset() {},
+      async resetPassword() {},
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/auth/login",
+    method: "POST",
+    origin: undefined,
+    ip: "127.0.0.1",
+    userAgent: "Mozilla/5.0",
+    contentType: "application/json",
+    cookieHeader: "",
+    rawBody: JSON.stringify({
+      email: "beta@example.com",
+      password: "password12345",
+    }),
+  });
+
+  assert.equal(result.status, 429);
+  assert.equal(loginCalls, 0);
+  assert.equal(result.headers["retry-after"], "60");
+});
+
+test("POST /api/auth/login rejects non-JSON content types", async () => {
+  const api = createAuthApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    rateLimiter: createAllowedRateLimiter(),
+    authService: {
+      validateRegistrationInput() {
+        return {};
+      },
+      validateLoginInput() {
+        return {};
+      },
+      validateResetInput() {
+        return { password: "" };
+      },
+      normalizeEmail(value) {
+        return String(value).toLowerCase();
+      },
+      async register() {
+        return null;
+      },
+      async login() {
+        throw new Error("Should not be invoked when content-type is wrong.");
+      },
+      async getSessionFromCookie() {
+        return null;
+      },
+      async logout() {},
+      async requestPasswordReset() {},
+      async resetPassword() {},
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/auth/login",
+    method: "POST",
+    origin: undefined,
+    ip: "127.0.0.1",
+    userAgent: "Mozilla/5.0",
+    contentType: "text/plain",
+    cookieHeader: "",
+    rawBody: "email=foo&password=bar",
+  });
+
+  assert.equal(result.status, 415);
 });

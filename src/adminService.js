@@ -1,5 +1,17 @@
+import crypto from "node:crypto";
+
 import { getConfig } from "./config.js";
 import { DatabaseNotConfiguredError, query, withTransaction } from "./db.js";
+
+const AUDIT_ACTIONS = Object.freeze({
+  USER_DISABLED: "user.disabled",
+  USER_ENABLED: "user.enabled",
+  COMMENT_RESOLVED: "comment.resolved",
+  COMMENT_REOPENED: "comment.reopened",
+});
+
+const AUDIT_LOG_DEFAULT_LIMIT = 100;
+const AUDIT_LOG_MAX_LIMIT = 500;
 
 export class AdminConfigurationError extends Error {
   constructor(message) {
@@ -169,29 +181,38 @@ export function createAdminService(options = {}) {
 
     async setCommentResolved({ adminUser, commentId, resolved }) {
       try {
-        const result = await query(
-          config,
-          `
-            UPDATE bug_reports
-            SET
-              resolved_at = CASE WHEN $2 THEN NOW() ELSE NULL END,
-              resolved_by_user_id = CASE WHEN $2 THEN $3 ELSE NULL END
-            WHERE id = $1
-            RETURNING id, resolved_at
-          `,
-          [commentId, Boolean(resolved), adminUser.id],
-        );
+        return await withTransaction(config, async (client) => {
+          const result = await client.query(
+            `
+              UPDATE bug_reports
+              SET
+                resolved_at = CASE WHEN $2 THEN NOW() ELSE NULL END,
+                resolved_by_user_id = CASE WHEN $2 THEN $3 ELSE NULL END
+              WHERE id = $1
+              RETURNING id, resolved_at
+            `,
+            [commentId, Boolean(resolved), adminUser.id],
+          );
 
-        const row = result.rows[0];
-        if (!row) {
-          throw new AdminNotFoundError("Comment not found.");
-        }
+          const row = result.rows[0];
+          if (!row) {
+            throw new AdminNotFoundError("Comment not found.");
+          }
 
-        return {
-          id: row.id,
-          isResolved: Boolean(row.resolved_at),
-          resolvedAt: row.resolved_at,
-        };
+          await writeAuditLog(client, {
+            adminUser,
+            action: resolved
+              ? AUDIT_ACTIONS.COMMENT_RESOLVED
+              : AUDIT_ACTIONS.COMMENT_REOPENED,
+            targetId: row.id,
+          });
+
+          return {
+            id: row.id,
+            isResolved: Boolean(row.resolved_at),
+            resolvedAt: row.resolved_at,
+          };
+        });
       } catch (error) {
         if (error instanceof DatabaseNotConfiguredError) {
           throw new AdminConfigurationError(error.message);
@@ -207,7 +228,7 @@ export function createAdminService(options = {}) {
       }
 
       try {
-        return withTransaction(config, async (client) => {
+        return await withTransaction(config, async (client) => {
           const updateResult = await client.query(
             `
               UPDATE users
@@ -236,6 +257,15 @@ export function createAdminService(options = {}) {
             );
           }
 
+          await writeAuditLog(client, {
+            adminUser,
+            action: disabled
+              ? AUDIT_ACTIONS.USER_DISABLED
+              : AUDIT_ACTIONS.USER_ENABLED,
+            targetId: user.id,
+            metadata: { targetEmail: user.email },
+          });
+
           return {
             id: user.id,
             email: user.email,
@@ -251,5 +281,65 @@ export function createAdminService(options = {}) {
         throw error;
       }
     },
+
+    async listAuditLog({ limit } = {}) {
+      const requested = Number.parseInt(limit, 10);
+      const cappedLimit = Number.isInteger(requested) && requested > 0
+        ? Math.min(requested, AUDIT_LOG_MAX_LIMIT)
+        : AUDIT_LOG_DEFAULT_LIMIT;
+
+      try {
+        const result = await query(
+          config,
+          `
+            SELECT
+              admin_audit_log.id,
+              admin_audit_log.admin_user_id,
+              admin_audit_log.admin_email,
+              admin_audit_log.action,
+              admin_audit_log.target_id,
+              admin_audit_log.metadata,
+              admin_audit_log.created_at
+            FROM admin_audit_log
+            ORDER BY admin_audit_log.created_at DESC
+            LIMIT $1
+          `,
+          [cappedLimit],
+        );
+
+        return result.rows.map((row) => ({
+          id: row.id,
+          adminUserId: row.admin_user_id,
+          adminEmail: row.admin_email,
+          action: row.action,
+          targetId: row.target_id,
+          metadata: row.metadata ?? {},
+          createdAt: row.created_at,
+        }));
+      } catch (error) {
+        if (error instanceof DatabaseNotConfiguredError) {
+          throw new AdminConfigurationError(error.message);
+        }
+
+        throw error;
+      }
+    },
   };
+}
+
+async function writeAuditLog(client, { adminUser, action, targetId, metadata = {} }) {
+  await client.query(
+    `
+      INSERT INTO admin_audit_log (id, admin_user_id, admin_email, action, target_id, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+    `,
+    [
+      crypto.randomUUID(),
+      adminUser?.id ?? null,
+      adminUser?.email ?? "",
+      action,
+      targetId ?? null,
+      JSON.stringify(metadata ?? {}),
+    ],
+  );
 }
