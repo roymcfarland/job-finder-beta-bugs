@@ -9,6 +9,7 @@ import { createAuthService } from "./authService.js";
 import { createBugReportApi } from "./bugReportApi.js";
 import { createBugReportService } from "./bugReportService.js";
 import { getConfig } from "./config.js";
+import { createCronApi } from "./cronApi.js";
 import {
   BodyTooLargeError,
   buildApiHeaders,
@@ -102,6 +103,12 @@ export function createApp(options = {}) {
           windowMs: config.reportRateLimitWindowMs,
         }),
     });
+  const cronApi =
+    options.cronApi ??
+    createCronApi({
+      config,
+      logger: options.logger,
+    });
 
   return {
     async handleNodeRequest(request, response) {
@@ -144,6 +151,7 @@ export function createApp(options = {}) {
       cookieHeader: request.headers.cookie,
       searchParams: url.searchParams,
       contentType: request.headers["content-type"],
+      authorization: request.headers.authorization,
       ip: getClientIp(request.headers, request.socket.remoteAddress, {
         trustProxy: config.trustProxy,
       }),
@@ -228,6 +236,10 @@ export function createApp(options = {}) {
 
     if (requestContext.pathname.startsWith("/api/admin/")) {
       return adminApi.handle(apiRequest);
+    }
+
+    if (requestContext.pathname.startsWith("/api/cron/")) {
+      return cronApi.handle(apiRequest);
     }
 
     if (

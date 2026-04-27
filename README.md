@@ -34,7 +34,7 @@ The app auto-loads `.env` and `.env.local` in local development.
 - `npm run dev` starts the app with `node --watch`
 - `npm test` runs the built-in Node tests
 - `npm run migrate` applies database migrations off the request hot path (safe to run during deploy)
-- `npm run cleanup` deletes expired sessions and used/expired password-reset tokens
+- `npm run cleanup` deletes expired sessions and used/expired password-reset tokens (also runs nightly via Vercel Cron at `/api/cron/cleanup`)
 
 ## Environment variables
 
@@ -44,6 +44,7 @@ Required for the full production flow:
 - `EMAIL_FROM`
 - `APP_BASE_URL`
 - `ADMIN_EMAILS`
+- `CRON_SECRET` (required to enable the scheduled cleanup endpoint; generate with `openssl rand -hex 32`)
 
 Database configuration:
 
@@ -79,8 +80,8 @@ Optional:
 
 - Import the repo into Vercel
 - Attach a Postgres integration or set `DATABASE_URL` manually
-- Add `RESEND_API_KEY`, `EMAIL_FROM`, and `APP_BASE_URL`
-- Deploy
+- Add `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL`, `ADMIN_EMAILS`, and `CRON_SECRET`
+- Deploy. `vercel.json` registers a daily cron at `/api/cron/cleanup`; Vercel automatically calls it with `Authorization: Bearer ${CRON_SECRET}`.
 
 `APP_BASE_URL` is also used for canonical URLs and social preview images, so set
 it to the public production origin before sharing links.

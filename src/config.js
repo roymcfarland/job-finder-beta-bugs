@@ -15,6 +15,7 @@ export function getConfig(env = process.env) {
     baseUrl: getBaseUrl(env),
     allowedOrigin: env.ALLOWED_ORIGIN?.trim() || "",
     adminEmails: parseEmailList(env.ADMIN_EMAILS),
+    cronSecret: env.CRON_SECRET?.trim() || "",
     trustProxy: parseBoolean(env.TRUST_PROXY, isLikelyVercel(env)),
     passwordMinLength: parsePositiveInteger(
       env.PASSWORD_MIN_LENGTH,
