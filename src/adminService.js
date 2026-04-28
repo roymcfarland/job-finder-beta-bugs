@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { getConfig } from "./config.js";
 import { DatabaseNotConfiguredError, query, withTransaction } from "./db.js";
+import { isUuid } from "./uuid.js";
 
 const AUDIT_ACTIONS = Object.freeze({
   USER_DISABLED: "user.disabled",
@@ -117,6 +118,10 @@ export function createAdminService(options = {}) {
         : "all";
       const filterUserId = String(userId || "").trim();
 
+      if (filterUserId && !isUuid(filterUserId)) {
+        throw new AdminActionError("Invalid user id filter.");
+      }
+
       try {
         const result = await query(
           config,
@@ -180,6 +185,11 @@ export function createAdminService(options = {}) {
     },
 
     async setCommentResolved({ adminUser, commentId, resolved }) {
+      const normalizedCommentId = String(commentId || "").trim();
+      if (!isUuid(normalizedCommentId)) {
+        throw new AdminActionError("Invalid comment id.");
+      }
+
       try {
         return await withTransaction(config, async (client) => {
           const result = await client.query(
@@ -191,7 +201,7 @@ export function createAdminService(options = {}) {
               WHERE id = $1
               RETURNING id, resolved_at
             `,
-            [commentId, Boolean(resolved), adminUser.id],
+            [normalizedCommentId, Boolean(resolved), adminUser.id],
           );
 
           const row = result.rows[0];
@@ -223,7 +233,12 @@ export function createAdminService(options = {}) {
     },
 
     async setUserDisabled({ adminUser, targetUserId, disabled }) {
-      if (adminUser.id === targetUserId) {
+      const normalizedTargetId = String(targetUserId || "").trim();
+      if (!isUuid(normalizedTargetId)) {
+        throw new AdminActionError("Invalid user id.");
+      }
+
+      if (adminUser.id === normalizedTargetId) {
         throw new AdminActionError("You can't disable your own admin account.");
       }
 
@@ -239,7 +254,7 @@ export function createAdminService(options = {}) {
               WHERE id = $1
               RETURNING id, email, role, disabled_at
             `,
-            [targetUserId, Boolean(disabled), adminUser.id],
+            [normalizedTargetId, Boolean(disabled), adminUser.id],
           );
 
           const user = updateResult.rows[0];

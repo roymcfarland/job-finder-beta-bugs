@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 import { cleanupExpiredSessions, cleanupUsedResetTokens } from "./db.js";
-import { jsonResponse, methodNotAllowedResponse } from "./http.js";
+import { getSecurityHeaders, jsonResponse, methodNotAllowedResponse } from "./http.js";
 import { getErrorContext } from "./logger.js";
 
 // Vercel Cron invokes scheduled paths via GET. When CRON_SECRET is set on the
@@ -18,7 +18,10 @@ export function createCronApi(options = {}) {
 
   return {
     async handle(request) {
-      const headers = { "cache-control": "no-store" };
+      const headers = {
+        ...getSecurityHeaders({ environment: config.environment }),
+        "cache-control": "no-store",
+      };
 
       if (request.method !== "GET" && request.method !== "POST") {
         return methodNotAllowedResponse(headers, "GET, POST");
@@ -92,14 +95,14 @@ function isAuthorized(authorizationHeader, secret) {
     return false;
   }
 
-  const providedBytes = Buffer.from(provided, "utf8");
-  const secretBytes = Buffer.from(secret, "utf8");
+  // Compare HMACs so verification time and success do not depend on token
+  // length (avoids leaking secret length via early returns).
+  const sign = (value) =>
+    crypto.createHmac("sha256", secret).update(value, "utf8").digest();
 
-  // timingSafeEqual throws on length mismatch; a length-difference reveal is
-  // acceptable here because the secret length is fixed per deployment.
-  if (providedBytes.length !== secretBytes.length) {
+  try {
+    return crypto.timingSafeEqual(sign(provided), sign(secret));
+  } catch {
     return false;
   }
-
-  return crypto.timingSafeEqual(providedBytes, secretBytes);
 }

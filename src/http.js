@@ -6,9 +6,51 @@ export class BodyTooLargeError extends Error {
 }
 
 export class InvalidJsonError extends Error {
-  constructor() {
-    super("Payload must be a JSON object.");
+  constructor(message = "Payload must be a JSON object.") {
+    super(message);
     this.name = "InvalidJsonError";
+  }
+}
+
+/** Enough for all current API bodies; blocks runaway key lists. */
+export const JSON_OBJECT_MAX_KEYS = 80;
+
+const FORBIDDEN_JSON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function assertPlainJsonObject(value, depth, maxDepth) {
+  if (depth > maxDepth) {
+    throw new InvalidJsonError("JSON is nested too deeply.");
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new InvalidJsonError();
+  }
+
+  const keys = Object.keys(value);
+  if (keys.length > JSON_OBJECT_MAX_KEYS) {
+    throw new InvalidJsonError("JSON object has too many keys.");
+  }
+
+  for (const key of keys) {
+    if (FORBIDDEN_JSON_KEYS.has(key) || key.startsWith("__")) {
+      throw new InvalidJsonError("JSON object contains forbidden keys.");
+    }
+
+    const entry = value[key];
+    if (entry === null || typeof entry === "string" || typeof entry === "number") {
+      continue;
+    }
+    if (typeof entry === "boolean") {
+      continue;
+    }
+    if (typeof entry === "object") {
+      if (Array.isArray(entry)) {
+        throw new InvalidJsonError("JSON arrays are not allowed in the payload.");
+      }
+      assertPlainJsonObject(entry, depth + 1, maxDepth);
+    } else {
+      throw new InvalidJsonError("JSON contains unsupported value types.");
+    }
   }
 }
 
@@ -66,7 +108,7 @@ export function getSecurityHeaders(options = {}) {
     options.environment ?? process.env.NODE_ENV?.trim().toLowerCase() ?? "development";
   const headers = {
     "content-security-policy":
-      "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; manifest-src 'self'",
+      "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'none'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; frame-src 'none'; manifest-src 'self'",
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
@@ -124,7 +166,7 @@ export function getMimeType(filePath) {
   return "application/octet-stream";
 }
 
-export function parseJsonObject(rawBody) {
+export function parseJsonObject(rawBody, { maxNestingDepth = 4 } = {}) {
   if (!rawBody) {
     throw new InvalidJsonError();
   }
@@ -139,6 +181,8 @@ export function parseJsonObject(rawBody) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new InvalidJsonError();
   }
+
+  assertPlainJsonObject(parsed, 0, maxNestingDepth);
 
   return parsed;
 }

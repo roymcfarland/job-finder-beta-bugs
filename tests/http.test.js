@@ -6,8 +6,10 @@ import {
   getClientIp,
   getMimeType,
   getSecurityHeaders,
+  InvalidJsonError,
   isJsonContentType,
   parseCookies,
+  parseJsonObject,
 } from "../src/http.js";
 
 test("parseCookies ignores malformed percent-encoded cookie values", () => {
@@ -70,4 +72,24 @@ test("buildApiHeaders only emits CORS headers when the origin matches", () => {
   assert.equal(allowed["access-control-allow-origin"], "https://app.example");
   assert.equal(allowed.vary, "Origin");
   assert.equal(blocked["access-control-allow-origin"], undefined);
+});
+
+test("parseJsonObject rejects prototype pollution keys", () => {
+  assert.throws(
+    () => parseJsonObject('{"__proto__":{"polluted":true}}'),
+    InvalidJsonError,
+  );
+});
+
+test("parseJsonObject rejects top-level arrays and nested JSON arrays", () => {
+  assert.throws(() => parseJsonObject("[1,2]"), InvalidJsonError);
+  assert.throws(
+    () => parseJsonObject('{"ok":true,"nested":[1]}'),
+    InvalidJsonError,
+  );
+});
+
+test("parseJsonObject accepts nested plain objects", () => {
+  const value = parseJsonObject('{"outer":{"inner":"x"}}');
+  assert.equal(value.outer.inner, "x");
 });

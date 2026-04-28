@@ -159,7 +159,7 @@ export function createApp(options = {}) {
     };
 
     if (pathname.startsWith("/api/")) {
-      return handleApiRequest(request, requestContext);
+      return await handleApiRequest(request, requestContext);
     }
 
     if (!["GET", "HEAD"].includes(method)) {
@@ -230,30 +230,37 @@ export function createApp(options = {}) {
       rawBody,
     };
 
-    if (requestContext.pathname.startsWith("/api/auth/")) {
-      return authApi.handle(apiRequest);
-    }
+    const fallbackHeaders = buildApiHeaders(config.allowedOrigin, requestContext.origin);
 
-    if (requestContext.pathname.startsWith("/api/admin/")) {
-      return adminApi.handle(apiRequest);
-    }
+    try {
+      if (requestContext.pathname.startsWith("/api/auth/")) {
+        return await authApi.handle(apiRequest);
+      }
 
-    if (requestContext.pathname.startsWith("/api/cron/")) {
-      return cronApi.handle(apiRequest);
-    }
+      if (requestContext.pathname.startsWith("/api/admin/")) {
+        return await adminApi.handle(apiRequest);
+      }
 
-    if (
-      requestContext.pathname === "/api/report" ||
-      requestContext.pathname === "/api/reports"
-    ) {
-      return bugReportApi.handle(apiRequest);
-    }
+      if (requestContext.pathname.startsWith("/api/cron/")) {
+        return await cronApi.handle(apiRequest);
+      }
 
-    return jsonResponse(
-      404,
-      { error: "Not found." },
-      buildApiHeaders(config.allowedOrigin, requestContext.origin),
-    );
+      if (
+        requestContext.pathname === "/api/report" ||
+        requestContext.pathname === "/api/reports"
+      ) {
+        return await bugReportApi.handle(apiRequest);
+      }
+
+      return jsonResponse(404, { error: "Not found." }, fallbackHeaders);
+    } catch (error) {
+      logApiError(logger, requestContext, error);
+      return jsonResponse(
+        500,
+        { error: "Something went wrong while handling this API request." },
+        fallbackHeaders,
+      );
+    }
   }
 }
 
@@ -367,6 +374,19 @@ function logUnhandledRequestError(logger, request, error) {
     ...getErrorContext(error),
     method: request.method ?? "GET",
     pathname: getRequestPathname(request.url),
+  });
+}
+
+function logApiError(logger, requestContext, error) {
+  const log = logger.error ?? logger.log;
+  if (typeof log !== "function") {
+    return;
+  }
+
+  log.call(logger, "Unhandled API error.", {
+    ...getErrorContext(error),
+    method: requestContext.method ?? "GET",
+    pathname: requestContext.pathname ?? "/",
   });
 }
 

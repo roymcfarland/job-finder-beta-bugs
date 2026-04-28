@@ -2,6 +2,8 @@ const DEFAULT_REPORT_LIMIT_MAX = 5;
 const DEFAULT_REPORT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_AUTH_LIMIT_MAX = 12;
 const DEFAULT_AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const DEFAULT_ADMIN_LIMIT_MAX = 240;
+const DEFAULT_ADMIN_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_PASSWORD_MIN_LENGTH = 10;
@@ -36,6 +38,14 @@ export function getConfig(env = process.env) {
     reportRateLimitWindowMs: parsePositiveInteger(
       env.RATE_LIMIT_WINDOW_MS,
       DEFAULT_REPORT_LIMIT_WINDOW_MS,
+    ),
+    adminRateLimitMax: parsePositiveInteger(
+      env.ADMIN_RATE_LIMIT_MAX,
+      DEFAULT_ADMIN_LIMIT_MAX,
+    ),
+    adminRateLimitWindowMs: parsePositiveInteger(
+      env.ADMIN_RATE_LIMIT_WINDOW_MS,
+      DEFAULT_ADMIN_LIMIT_WINDOW_MS,
     ),
     session: (() => {
       const secureCookie =

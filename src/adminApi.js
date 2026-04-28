@@ -12,9 +12,17 @@ import {
   methodNotAllowedResponse,
   parseJsonObject,
 } from "./http.js";
+import { createRateLimitStore } from "./rateLimitStore.js";
+import { isUuid } from "./uuid.js";
 
 export function createAdminApi(options) {
   const { config, authService, adminService } = options;
+  const rateLimiter =
+    options.rateLimiter ??
+    createRateLimitStore({
+      limit: config.adminRateLimitMax,
+      windowMs: config.adminRateLimitWindowMs,
+    });
 
   return {
     async handle(request) {
@@ -46,6 +54,18 @@ export function createAdminApi(options) {
         return jsonResponse(403, { error: "Admin access required." }, headers);
       }
 
+      const adminLimit = rateLimiter.consume(`admin:${request.ip || "unknown"}`, Date.now());
+      if (!adminLimit.allowed) {
+        return jsonResponse(
+          429,
+          { error: "Too many admin requests. Please try again shortly." },
+          {
+            ...headers,
+            "retry-after": String(adminLimit.retryAfterSeconds),
+          },
+        );
+      }
+
       try {
         if (request.pathname === "/api/admin/dashboard") {
           if (request.method !== "GET") {
@@ -61,8 +81,13 @@ export function createAdminApi(options) {
             return methodNotAllowedResponse(headers, "GET, OPTIONS");
           }
 
+          const filterUserId = (request.searchParams.get("userId") ?? "").trim();
+          if (filterUserId && !isUuid(filterUserId)) {
+            return jsonResponse(400, { error: "Invalid user id filter." }, headers);
+          }
+
           const comments = await adminService.listComments({
-            userId: request.searchParams.get("userId") || "",
+            userId: filterUserId,
             status: request.searchParams.get("status") || "all",
           });
 

@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 import { createAdminApi } from "../src/adminApi.js";
 import { getConfig } from "../src/config.js";
 
+const SAMPLE_USER_A = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+const SAMPLE_USER_B = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22";
+
 function createAdminSession() {
   return {
     user: {
@@ -71,7 +74,7 @@ test("GET /api/admin/comments returns filtered comment data for admins", async (
         return {};
       },
       async listComments({ userId, status }) {
-        assert.equal(userId, "user_1");
+        assert.equal(userId, SAMPLE_USER_A);
         assert.equal(status, "unresolved");
 
         return [
@@ -98,7 +101,7 @@ test("GET /api/admin/comments returns filtered comment data for admins", async (
     cookieHeader: "jobfinder_session=session_token",
     rawBody: "",
     searchParams: new URLSearchParams({
-      userId: "user_1",
+      userId: SAMPLE_USER_A,
       status: "unresolved",
     }),
   });
@@ -107,6 +110,45 @@ test("GET /api/admin/comments returns filtered comment data for admins", async (
   const body = JSON.parse(result.body);
   assert.equal(body.comments.length, 1);
   assert.equal(body.comments[0].id, "comment_1");
+});
+
+test("GET /api/admin/comments rejects a non-UUID userId filter", async () => {
+  const api = createAdminApi({
+    config: getConfig({ NODE_ENV: "test" }),
+    authService: {
+      async getSessionFromCookie() {
+        return createAdminSession();
+      },
+    },
+    adminService: {
+      async getDashboardData() {
+        return {};
+      },
+      async listComments() {
+        assert.fail("listComments should not run for invalid user id");
+      },
+      async setCommentResolved() {
+        return {};
+      },
+      async setUserDisabled() {
+        return {};
+      },
+    },
+  });
+
+  const result = await api.handle({
+    pathname: "/api/admin/comments",
+    method: "GET",
+    origin: undefined,
+    cookieHeader: "jobfinder_session=session_token",
+    rawBody: "",
+    searchParams: new URLSearchParams({
+      userId: "not-a-uuid",
+      status: "all",
+    }),
+  });
+
+  assert.equal(result.status, 400);
 });
 
 test("POST /api/admin/users/status toggles disabled state", async () => {
@@ -128,11 +170,11 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
         return {};
       },
       async setUserDisabled({ targetUserId, disabled }) {
-        assert.equal(targetUserId, "user_2");
+        assert.equal(targetUserId, SAMPLE_USER_B);
         assert.equal(disabled, true);
 
         return {
-          id: "user_2",
+          id: SAMPLE_USER_B,
           email: "beta@example.com",
           role: "user",
           isDisabled: true,
@@ -148,7 +190,7 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
     contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: JSON.stringify({
-      userId: "user_2",
+      userId: SAMPLE_USER_B,
       disabled: true,
     }),
     searchParams: new URLSearchParams(),
@@ -187,7 +229,7 @@ test("GET /api/admin/audit-log returns entries for admins", async () => {
             id: "audit_1",
             adminEmail: "owner@example.com",
             action: "user.disabled",
-            targetId: "user_2",
+            targetId: SAMPLE_USER_B,
             metadata: { targetEmail: "beta@example.com" },
             createdAt: "2026-04-25T12:00:00.000Z",
           },
@@ -243,7 +285,7 @@ test("POST /api/admin/users/status rejects non-boolean action values", async () 
     contentType: "application/json",
     cookieHeader: "jobfinder_session=session_token",
     rawBody: JSON.stringify({
-      userId: "user_2",
+      userId: SAMPLE_USER_B,
       disabled: "false",
     }),
     searchParams: new URLSearchParams(),
