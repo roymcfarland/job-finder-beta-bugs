@@ -1,4 +1,4 @@
-const tabs = [...document.querySelectorAll("[data-mode]")];
+const modeTriggers = [...document.querySelectorAll("[data-mode]")];
 const panels = [...document.querySelectorAll("[data-panel]")];
 const statusPanel = document.querySelector("#auth-status");
 const sessionCta = document.querySelector("#session-cta");
@@ -30,9 +30,9 @@ const formConfigs = [
 
 initialize();
 
-for (const tab of tabs) {
-  tab.addEventListener("click", () => {
-    switchMode(tab.dataset.mode);
+for (const trigger of modeTriggers) {
+  trigger.addEventListener("click", () => {
+    switchMode(trigger.dataset.mode);
   });
 }
 
@@ -68,10 +68,6 @@ async function initialize() {
 
 function switchMode(mode) {
   clearErrors();
-
-  for (const tab of tabs) {
-    tab.classList.toggle("is-active", tab.dataset.mode === mode);
-  }
 
   for (const panel of panels) {
     panel.classList.toggle("hidden", panel.dataset.panel !== mode);

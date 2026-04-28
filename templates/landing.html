@@ -22,7 +22,7 @@
           where you left off.
         </p>
         <p class="hero-note">
-          Use the panel to log in, create an account, or recover access.
+          Sign in with your tester account, or create one to start reporting.
         </p>
       </section>
 
@@ -32,18 +32,6 @@
           <a class="button-link button-link--secondary" href="/dashboard">
             Open bug dashboard
           </a>
-        </div>
-
-        <div class="auth-tabs" role="tablist" aria-label="Authentication options">
-          <button class="auth-tab is-active" type="button" data-mode="login">
-            Log in
-          </button>
-          <button class="auth-tab" type="button" data-mode="register">
-            Create account
-          </button>
-          <button class="auth-tab" type="button" data-mode="forgot">
-            Reset password
-          </button>
         </div>
 
         <section class="auth-panel" data-panel="login">
@@ -67,8 +55,23 @@
               <p class="field-error" data-error-for="login-password"></p>
             </label>
 
+            <p class="auth-inline-action">
+              <button class="text-link" type="button" data-mode="forgot">
+                Forgot password?
+              </button>
+            </p>
+
             <button class="button-primary" type="submit">Log in</button>
           </form>
+
+          <div class="auth-panel-footer">
+            <p class="muted">
+              Don’t have an account?
+              <button class="text-link" type="button" data-mode="register">
+                Create account
+              </button>
+            </p>
+          </div>
         </section>
 
         <section class="auth-panel hidden" data-panel="register">
@@ -97,6 +100,15 @@
 
             <button class="button-primary" type="submit">Create account</button>
           </form>
+
+          <div class="auth-panel-footer">
+            <p class="muted">
+              Already have an account?
+              <button class="text-link" type="button" data-mode="login">
+                Sign in
+              </button>
+            </p>
+          </div>
         </section>
 
         <section class="auth-panel hidden" data-panel="forgot">
@@ -114,6 +126,12 @@
 
             <button class="button-primary" type="submit">Send reset link</button>
           </form>
+
+          <div class="auth-panel-footer">
+            <button class="text-link" type="button" data-mode="login">
+              Back to sign in
+            </button>
+          </div>
         </section>
 
         <section id="auth-status" class="status" aria-live="polite"></section>

@@ -214,18 +214,6 @@ h3 {
   width: min(100%, 460px);
 }
 
-.auth-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
-  padding: 0.3rem;
-  margin-bottom: 0.35rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-}
-
-.auth-tab,
 .button-primary,
 .button-secondary,
 .button-link {
@@ -237,17 +225,24 @@ h3 {
   cursor: pointer;
 }
 
-.auth-tab {
-  padding: 0.82rem 0.85rem;
-  background: transparent;
-  color: var(--muted);
+.auth-inline-action {
+  margin: -0.25rem 0 0;
+  text-align: right;
 }
 
-.auth-tab.is-active {
-  color: var(--ink);
-  background: var(--panel-strong);
-  border-color: rgba(127, 184, 255, 0.35);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+.auth-panel-footer {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.auth-panel-footer p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .auth-panel,
@@ -357,8 +352,7 @@ select:focus {
 
 .button-primary:hover,
 .button-secondary:hover,
-.button-link:hover,
-.auth-tab:hover {
+.button-link:hover {
   transform: translateY(-1px);
 }
 
@@ -616,6 +610,20 @@ select:focus {
   text-decoration: none;
 }
 
+button.text-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+button.text-link:hover {
+  transform: none;
+}
+
 .text-link:hover {
   color: #356ec0;
 }
@@ -640,8 +648,7 @@ select:focus {
     padding: 1.25rem 0 2.5rem;
   }
 
-  .two-up,
-  .auth-tabs {
+  .two-up {
     grid-template-columns: 1fr;
   }
 
