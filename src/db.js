@@ -14,13 +14,13 @@ export class DatabaseNotConfiguredError extends Error {
 // (during a deploy) can't deadlock on AccessExclusiveLock contention.
 const SCHEMA_LOCK_KEY = 7283749274n;
 
-const globalStore = globalThis.__jobfinderDbStore ?? {
+const globalStore = globalThis.__bugReporterDbStore ?? {
   pool: null,
   connectionUrl: "",
   schemaReady: null,
 };
 
-globalThis.__jobfinderDbStore = globalStore;
+globalThis.__bugReporterDbStore = globalStore;
 
 export function getPool(config) {
   const connectionUrl = config.database.url;
@@ -220,7 +220,7 @@ async function runMigrations(client) {
       expected_behavior TEXT NOT NULL DEFAULT '',
       extra_details TEXT NOT NULL DEFAULT '',
       client_context JSONB NOT NULL DEFAULT '{}'::jsonb,
-      source TEXT NOT NULL DEFAULT 'jobfinder-beta-bug-form',
+      source TEXT NOT NULL DEFAULT 'beta-bug-report-form',
       user_agent TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

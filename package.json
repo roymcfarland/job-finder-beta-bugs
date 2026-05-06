@@ -1,9 +1,9 @@
 {
-  "name": "jobfinder-beta-bugs",
+  "name": "beta-bug-reporter",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Lightweight bug-report inbox for JobFinder.guru beta users.",
+  "description": "Lightweight bug-report inbox for authenticated beta users.",
   "engines": {
     "node": ">=20"
   },

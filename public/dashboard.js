@@ -8,7 +8,7 @@ const logoutButton = document.querySelector("#logout-button");
 const sessionEmail = document.querySelector("#session-email");
 const recentReports = document.querySelector("#recent-reports");
 const adminLink = document.querySelector("#admin-link");
-const storageKey = "jobfinder-beta-bugs:report-draft:v2";
+const storageKey = "beta-bug-reporter:report-draft:v2";
 const severityLevels = ["low", "medium", "high", "blocking"];
 
 initialize().catch(() => {

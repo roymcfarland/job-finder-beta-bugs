@@ -7,13 +7,14 @@ const DEFAULT_ADMIN_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_PASSWORD_MIN_LENGTH = 10;
+const DEFAULT_APP_NAME = "Beta Bug Reporter";
 
 export function getConfig(env = process.env) {
   const environment = env.NODE_ENV?.trim() || "development";
 
   return {
     environment,
-    appName: "JobFinder.guru Beta Bugs",
+    appName: env.APP_NAME?.trim() || DEFAULT_APP_NAME,
     baseUrl: getBaseUrl(env),
     allowedOrigin: env.ALLOWED_ORIGIN?.trim() || "",
     adminEmails: parseEmailList(env.ADMIN_EMAILS),
@@ -56,8 +57,8 @@ export function getConfig(env = process.env) {
       // Domain, which gives strong CSRF/cookie-injection protection. We can
       // only use it when Secure is set, so fall back to a plain name in dev.
       const defaultCookieName = secureCookie
-        ? "__Host-jobfinder_session"
-        : "jobfinder_session";
+        ? "__Host-bug_reporter_session"
+        : "bug_reporter_session";
 
       return {
         cookieName: env.SESSION_COOKIE_NAME?.trim() || defaultCookieName,

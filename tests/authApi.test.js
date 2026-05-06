@@ -73,7 +73,7 @@ test("POST /api/auth/register creates a session cookie on success", async () => 
   });
 
   assert.equal(result.status, 201);
-  assert.match(result.headers["set-cookie"], /jobfinder_session=session_token/);
+  assert.match(result.headers["set-cookie"], /bug_reporter_session=session_token/);
 
   const body = JSON.parse(result.body);
   assert.equal(body.user.email, "beta@example.com");
@@ -375,7 +375,7 @@ test("POST /api/auth/logout rejects requests from an unrecognized origin", async
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
   });
 
@@ -428,7 +428,7 @@ test("POST /api/auth/logout accepts requests with a matching origin", async () =
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
   });
 

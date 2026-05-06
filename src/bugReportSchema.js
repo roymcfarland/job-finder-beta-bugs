@@ -119,7 +119,7 @@ export function buildBugReportSubmission(payload, context = {}) {
     meta: {
       submissionId: crypto.randomUUID(),
       submittedAt: (context.now ?? new Date()).toISOString(),
-      source: "jobfinder-beta-bug-form",
+      source: "beta-bug-report-form",
       userAgent: normalizeText(context.userAgent, 400),
     },
   };

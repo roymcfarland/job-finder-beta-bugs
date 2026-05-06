@@ -24,7 +24,7 @@ server.on("error", (error) => {
 });
 
 server.listen(port, host, () => {
-  logger.info("JobFinder beta bug app listening.", {
+  logger.info("Beta bug reporter app listening.", {
     url: `http://${host}:${port}`,
   });
 });

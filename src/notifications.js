@@ -5,6 +5,8 @@ export class EmailDeliveryUnavailableError extends Error {
   }
 }
 
+const DEFAULT_APP_NAME = "Beta Bug Reporter";
+
 export function createNotificationService(config, options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const logger = options.logger ?? console;
@@ -32,6 +34,7 @@ export function createNotificationService(config, options = {}) {
           from: config.email.fromEmail,
           to: email,
           resetUrl,
+          appName: config.appName,
         }),
       );
 
@@ -60,6 +63,7 @@ export function createNotificationService(config, options = {}) {
             to: config.email.bugReportNotificationToEmail,
             reporterEmail,
             report,
+            appName: config.appName,
           }),
         );
         return { mode: "resend" };
@@ -121,11 +125,13 @@ async function sendWebhookNotification(fetchImpl, emailConfig, payload) {
   }
 }
 
-function buildPasswordResetEmail({ from, to, resetUrl }) {
+function buildPasswordResetEmail({ from, to, resetUrl, appName }) {
+  const displayName = getAppName(appName);
+
   return {
     from,
     to: [to],
-    subject: "Reset your JobFinder.guru beta password",
+    subject: `Reset your ${displayName} password`,
     text: [
       "We received a request to reset your password.",
       "",
@@ -136,7 +142,8 @@ function buildPasswordResetEmail({ from, to, resetUrl }) {
   };
 }
 
-function buildBugReportEmail({ from, to, reporterEmail, report }) {
+function buildBugReportEmail({ from, to, reporterEmail, report, appName }) {
+  const displayName = getAppName(appName);
   const lines = [
     `Report ID: ${report.meta.submissionId}`,
     `Submitted: ${report.meta.submittedAt}`,
@@ -167,9 +174,13 @@ function buildBugReportEmail({ from, to, reporterEmail, report }) {
     from,
     to: [to],
     reply_to: reporterEmail,
-    subject: `[JobFinder bug] ${report.report.summary}`,
+    subject: `[${displayName}] ${report.report.summary}`,
     text: lines.join("\n"),
   };
+}
+
+function getAppName(appName) {
+  return String(appName || "").trim() || DEFAULT_APP_NAME;
 }
 
 function ensureFetch(fetchImpl) {

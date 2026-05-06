@@ -53,7 +53,7 @@ test("GET /api/admin/dashboard requires admin access", async () => {
     pathname: "/api/admin/dashboard",
     method: "GET",
     origin: undefined,
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
     searchParams: new URLSearchParams(),
   });
@@ -98,7 +98,7 @@ test("GET /api/admin/comments returns filtered comment data for admins", async (
     pathname: "/api/admin/comments",
     method: "GET",
     origin: undefined,
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
     searchParams: new URLSearchParams({
       userId: SAMPLE_USER_A,
@@ -140,7 +140,7 @@ test("GET /api/admin/comments rejects a non-UUID userId filter", async () => {
     pathname: "/api/admin/comments",
     method: "GET",
     origin: undefined,
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
     searchParams: new URLSearchParams({
       userId: "not-a-uuid",
@@ -188,7 +188,7 @@ test("POST /api/admin/users/status toggles disabled state", async () => {
     method: "POST",
     origin: undefined,
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: JSON.stringify({
       userId: SAMPLE_USER_B,
       disabled: true,
@@ -283,7 +283,7 @@ test("POST /api/admin/users/status rejects non-boolean action values", async () 
     method: "POST",
     origin: undefined,
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: JSON.stringify({
       userId: SAMPLE_USER_B,
       disabled: "false",

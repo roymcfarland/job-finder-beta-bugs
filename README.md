@@ -1,4 +1,4 @@
-# JobFinder.guru Beta Bugs
+# Beta Bug Reporter
 
 Small Node app for authenticated beta bug reporting.
 
@@ -53,6 +53,7 @@ Database configuration:
 
 Optional:
 
+- `APP_NAME` for email subjects and social metadata
 - `BUG_REPORT_NOTIFICATION_TO_EMAIL`
 - `REPORT_WEBHOOK_URL`
 - `REPORT_WEBHOOK_TOKEN`

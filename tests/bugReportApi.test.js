@@ -10,7 +10,7 @@ function buildPayload(overrides = {}) {
     summary: "Bug in saved jobs",
     category: "broken-page",
     severity: "medium",
-    affectedUrl: "https://jobfinder.guru/saved",
+    affectedUrl: "https://app.example.com/saved",
     happened: "The list disappears after filtering.",
     reproduceSteps: "Open saved jobs and filter by remote.",
     expectedBehavior: "The list should stay visible.",
@@ -104,7 +104,7 @@ test("POST /api/report returns success for a valid authenticated report", async 
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: buildPayload(),
   });
 
@@ -149,7 +149,7 @@ test("POST /api/report returns field errors from validation failures", async () 
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
     contentType: "application/json",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: buildPayload(),
   });
 
@@ -196,7 +196,7 @@ test("GET /api/reports returns recent reports for the signed-in user", async () 
     origin: undefined,
     ip: "127.0.0.1",
     userAgent: "Mozilla/5.0",
-    cookieHeader: "jobfinder_session=session_token",
+    cookieHeader: "bug_reporter_session=session_token",
     rawBody: "",
   });
 

@@ -1,53 +1,64 @@
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
+const DEFAULT_APP_NAME = "Beta Bug Reporter";
 const SOCIAL_IMAGE = Object.freeze({
   path: "/og-image.png",
   type: "image/png",
   width: 1200,
   height: 630,
-  alt: "Atlas Bug Reporter dashboard preview",
 });
 
 const PAGE_META = Object.freeze({
   "landing.html": {
-    title: "Atlas Bug Reporter",
+    title: (appName) => appName,
     description:
       "Sign in to send clean bug reports, keep beta feedback organized, and pick up where you left off.",
     path: "/",
   },
   "dashboard.html": {
-    title: "Atlas Bug Dashboard",
+    title: (appName) => `${appName} Dashboard`,
     description:
-      "Submit structured bug reports for Atlas and track beta feedback in one focused dashboard.",
+      "Submit structured bug reports and track beta feedback in one focused dashboard.",
     path: "/dashboard",
   },
   "admin.html": {
-    title: "Atlas Admin",
+    title: (appName) => `${appName} Admin`,
     description:
-      "Review Atlas beta feedback, manage tester access, and resolve reports from one admin workspace.",
+      "Review beta feedback, manage tester access, and resolve reports from one admin workspace.",
     path: "/admin",
   },
   "reset-password.html": {
-    title: "Atlas Password Reset",
-    description: "Reset your Atlas bug reporter password securely.",
+    title: (appName) => `${appName} Password Reset`,
+    description: (appName) => `Reset your ${appName.toLowerCase()} password securely.`,
     path: "/reset-password",
   },
 });
 
-export function renderSocialMeta(template, fileName, baseUrl) {
+export function renderSocialMeta(
+  template,
+  fileName,
+  baseUrl,
+  appName = DEFAULT_APP_NAME,
+) {
   return template.replace(
     "{{SOCIAL_META}}",
-    buildSocialMetaTags(fileName, baseUrl),
+    buildSocialMetaTags(fileName, baseUrl, appName),
   );
 }
 
-export function buildSocialMetaTags(fileName, baseUrl) {
-  const page = PAGE_META[fileName] ?? PAGE_META["landing.html"];
+export function buildSocialMetaTags(
+  fileName,
+  baseUrl,
+  appName = DEFAULT_APP_NAME,
+) {
+  const displayName = normalizeAppName(appName);
+  const page = getPageMeta(fileName, displayName);
   const pageUrl = absoluteUrl(baseUrl, page.path);
   const imageUrl = absoluteUrl(baseUrl, SOCIAL_IMAGE.path);
+  const imageAlt = `${displayName} dashboard preview`;
   const tags = [
     ["link", "rel", "canonical", "href", pageUrl],
     ["meta", "property", "og:type", "content", "website"],
-    ["meta", "property", "og:site_name", "content", "Atlas Bug Reporter"],
+    ["meta", "property", "og:site_name", "content", displayName],
     ["meta", "property", "og:title", "content", page.title],
     ["meta", "property", "og:description", "content", page.description],
     ["meta", "property", "og:url", "content", pageUrl],
@@ -55,16 +66,33 @@ export function buildSocialMetaTags(fileName, baseUrl) {
     ["meta", "property", "og:image:type", "content", SOCIAL_IMAGE.type],
     ["meta", "property", "og:image:width", "content", String(SOCIAL_IMAGE.width)],
     ["meta", "property", "og:image:height", "content", String(SOCIAL_IMAGE.height)],
-    ["meta", "property", "og:image:alt", "content", SOCIAL_IMAGE.alt],
+    ["meta", "property", "og:image:alt", "content", imageAlt],
     ["meta", "name", "twitter:card", "content", "summary_large_image"],
     ["meta", "name", "twitter:title", "content", page.title],
     ["meta", "name", "twitter:description", "content", page.description],
     ["meta", "name", "twitter:image", "content", imageUrl],
-    ["meta", "name", "twitter:image:alt", "content", SOCIAL_IMAGE.alt],
+    ["meta", "name", "twitter:image:alt", "content", imageAlt],
     ["meta", "name", "theme-color", "content", "#f4f7fb"],
   ];
 
   return tags.map(formatTag).join("\n    ");
+}
+
+function getPageMeta(fileName, appName) {
+  const page = PAGE_META[fileName] ?? PAGE_META["landing.html"];
+  return {
+    ...page,
+    title: renderMetaValue(page.title, appName),
+    description: renderMetaValue(page.description, appName),
+  };
+}
+
+function renderMetaValue(value, appName) {
+  return typeof value === "function" ? value(appName) : value;
+}
+
+function normalizeAppName(appName) {
+  return String(appName || "").trim() || DEFAULT_APP_NAME;
 }
 
 function formatTag([tagName, ...attributeParts]) {

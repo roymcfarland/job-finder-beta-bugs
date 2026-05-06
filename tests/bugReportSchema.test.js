@@ -8,12 +8,12 @@ import {
 
 function buildValidPayload(startedAt = Date.now() - 5000) {
   return {
-    name: "Taylor Beta",
-    email: "taylor@example.com",
+    name: "Test User",
+    email: "reporter@example.com",
     summary: "Saved jobs page crashes",
     category: "broken-page",
     severity: "high",
-    affectedUrl: "https://jobfinder.guru/saved",
+    affectedUrl: "https://app.example.com/saved",
     happened: "The page shows a blank screen after I click apply filters.",
     reproduceSteps: "Open saved jobs and filter by remote jobs.",
     expectedBehavior: "The list should refresh normally.",
@@ -38,7 +38,7 @@ test("buildBugReportSubmission returns a normalized report", () => {
 
   assert.equal(report.report.summary, "Saved jobs page crashes");
   assert.equal(report.report.severity, "high");
-  assert.equal(report.reporter.email, "taylor@example.com");
+  assert.equal(report.reporter.email, "reporter@example.com");
   assert.equal(report.meta.submittedAt, now.toISOString());
   assert.match(report.meta.submissionId, /^[0-9a-f-]{36}$/);
 });

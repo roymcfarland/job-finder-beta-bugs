@@ -265,7 +265,7 @@ export function createApp(options = {}) {
 }
 
 async function serveTemplate(fileName, method, config) {
-  const html = await getRenderedTemplate(fileName, config.baseUrl);
+  const html = await getRenderedTemplate(fileName, config);
 
   return {
     status: 200,
@@ -278,14 +278,19 @@ async function serveTemplate(fileName, method, config) {
   };
 }
 
-async function getRenderedTemplate(fileName, baseUrl) {
-  const cacheKey = `${fileName}|${baseUrl}`;
+async function getRenderedTemplate(fileName, config) {
+  const cacheKey = `${fileName}|${config.baseUrl}|${config.appName}`;
   const cached = renderedTemplateCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const html = renderSocialMeta(await loadTemplate(fileName), fileName, baseUrl);
+  const html = renderSocialMeta(
+    await loadTemplate(fileName),
+    fileName,
+    config.baseUrl,
+    config.appName,
+  );
   renderedTemplateCache.set(cacheKey, html);
   return html;
 }
