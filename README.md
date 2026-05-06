@@ -1,4 +1,4 @@
-# Beta Bug Reporter
+# Atlas Beta Bugs Reporter
 
 Small Node app for authenticated beta bug reporting.
 
