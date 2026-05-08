@@ -1,94 +1,83 @@
-# Atlas Beta Bugs Reporter
+# Atlas Beta Bug Reporter
 
-Small Node app for authenticated beta bug reporting.
+> Authenticated bug-report inbox for the Atlas beta program. Verified beta users submit bugs that route directly to triage. Deliberately framework-free.
 
-It now includes:
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Live](https://img.shields.io/badge/live-brightlinebugs.com-brightgreen)](https://brightlinebugs.com)
 
-- Email/password accounts for beta testers
-- Password reset by email
-- Admin accounts with user disable/enable controls
-- An admin comment dashboard with resolve/reopen toggles and filters
-- A public landing page with login, sign-up, and reset flows
-- A protected bug-report dashboard behind session cookies
-- Open Graph and Twitter card previews for polished link sharing
-- Postgres-backed storage for users, sessions, reset tokens, and bug reports
-- Optional bug-report notifications through Resend or a webhook
+## What this is
+
+This is the public infrastructure half of a deliberate pattern: ship the product private, ship the infrastructure around it public.
+
+[Atlas](https://jobfinder.guru) is a private commercial AI-powered job search agent. **Atlas Beta Bug Reporter** is its public companion — the authenticated submission inbox where verified beta users report bugs, regressions, and behavior they want changed. Reports route to a triage queue for review and disposition.
+
+The interesting choice in this repo is what it doesn't have: no React, no Next.js, no UI framework. Just Node, Postgres, server-rendered HTML templates, and session cookies. The submission flow is fast, the surface area is small, and the whole thing is auditable in an afternoon. It is a working example of "lightweight and fit-for-purpose" applied to a problem where most teams would reach for a framework by reflex.
+
+## Features
+
+- Email + magic-link authentication for beta participants
+- Role-based routes (submitter, triager, admin)
+- Structured bug submission with severity, category, reproduction steps, and environment
+- Vercel Cron–driven housekeeping (digest emails, stale-report sweeps)
+- Resend-backed transactional email
+- Postgres-backed audit log of every status transition
+- Plain HTML templates — no client-side framework, no build step for the UI
+
+## Stack
+
+- **Runtime:** Node.js 20+
+- **Database:** Postgres
+- **Email:** [Resend](https://resend.com)
+- **Cron:** [Vercel Cron](https://vercel.com/docs/cron-jobs)
+- **Auth:** session cookies + magic-link tokens
+- **UI:** server-rendered HTML templates (zero frontend framework — deliberate)
+- **Hosting:** [Vercel](https://vercel.com)
+
+## Why no framework
+
+The submission surface is roughly five pages and four endpoints. A framework would have meant a build step, a hydration model, and a bundle for users who are reporting a bug and leaving. Instead the entire UI is HTML rendered on the server with a small templating helper. New developers can read the whole UI layer in one sitting.
+
+This is the engineering decision the repo is meant to demonstrate: choose the smallest tool that handles the actual workload.
 
 ## Quick start
 
-1. Copy `.env.example` to `.env`
-2. Install dependencies with `npm install`
-3. Configure:
-   - Postgres: `DATABASE_URL` locally, or let Vercel inject a Postgres connection variable in production
-   - Resend for password resets: `RESEND_API_KEY` and `EMAIL_FROM`
-   - Admin bootstrap: `ADMIN_EMAILS` with your own email address
-   - Optional bug report notifications: `BUG_REPORT_NOTIFICATION_TO_EMAIL` or `REPORT_WEBHOOK_URL`
-4. Run `npm start`
-5. Open [http://127.0.0.1:3000](http://127.0.0.1:3000)
+```bash
+git clone https://github.com/roymcfarland/atlas-beta-bug-reporter.git
+cd atlas-beta-bug-reporter
+npm install
+cp .env.example .env   # fill in DATABASE_URL, RESEND_API_KEY, SESSION_SECRET, etc.
+npm run db:migrate
+npm run dev
+```
 
-The app auto-loads `.env` and `.env.local` in local development.
+See `.env.example` for the full list of required environment variables.
 
-## Scripts
+## Project structure
 
-- `npm start` starts the production-style Node server
-- `npm run dev` starts the app with `node --watch`
-- `npm test` runs the built-in Node tests
-- `npm run migrate` applies database migrations off the request hot path (safe to run during deploy)
-- `npm run cleanup` deletes expired sessions and used/expired password-reset tokens (also runs nightly via Vercel Cron at `/api/cron/cleanup`)
+```
+.
+├── src/
+│   ├── routes/         # request handlers grouped by role
+│   ├── views/          # HTML templates
+│   ├── db/             # Postgres schema + queries
+│   ├── auth/           # magic-link + session logic
+│   └── jobs/           # Vercel Cron handlers
+├── migrations/         # SQL migrations
+└── public/             # static assets
+```
 
-## Environment variables
+## Where this fits
 
-Required for the full production flow:
+| Role | Project |
+|---|---|
+| Product (private) | [Atlas](https://jobfinder.guru) |
+| **Beta infrastructure (this repo)** | **Atlas Beta Bug Reporter — [brightlinebugs.com](https://brightlinebugs.com)** |
+| Author's GitHub profile | [github.com/roymcfarland](https://github.com/roymcfarland) |
 
-- `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `APP_BASE_URL`
-- `ADMIN_EMAILS`
-- `CRON_SECRET` (required to enable the scheduled cleanup endpoint; generate with `openssl rand -hex 32`)
+## License
 
-Database configuration:
+[MIT](LICENSE). Use it, fork it, learn from it. If it helps you ship something smaller, that is the point.
 
-- `DATABASE_URL` for local or generic Postgres hosting
-- Vercel storage integrations may inject `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, or related variables, and the app will use them automatically
+## Author
 
-Optional:
-
-- `APP_NAME` for email subjects and social metadata
-- `BUG_REPORT_NOTIFICATION_TO_EMAIL`
-- `REPORT_WEBHOOK_URL`
-- `REPORT_WEBHOOK_TOKEN`
-- `ALLOWED_ORIGIN` if your frontend and API are on different origins
-
-## Admin behavior
-
-- Any account whose email appears in `ADMIN_EMAILS` is treated as an admin account. Removing an email from a configured list demotes that account on next login or session refresh, and sibling sessions are dropped at that point.
-- An unset or empty `ADMIN_EMAILS` is treated as "not configured": existing admin roles in the database are preserved, no demotion runs, and a startup warning is logged in production. Set the variable to enable promotion/demotion via the env list.
-- Admins can disable or re-enable user accounts.
-- Disabled users lose active sessions immediately and cannot sign in again until re-enabled.
-- Admins can filter user comments by reporter and by resolved/unresolved state.
-- Comment resolution is a live toggle, so resolved comments can be reopened without reloading the page.
-- Disable/enable and resolve/reopen actions are recorded in the `admin_audit_log` table and exposed via `GET /api/admin/audit-log`.
-
-## Deployment
-
-### Plain Node host
-
-- Set the environment variables from `.env.example`
-- Use `npm start`
-- Point a domain or subdomain at the service
-
-### Vercel
-
-- Import the repo into Vercel
-- Attach a Postgres integration or set `DATABASE_URL` manually
-- Add `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL`, `ADMIN_EMAILS`, and `CRON_SECRET`
-- Deploy. `vercel.json` registers a daily cron at `/api/cron/cleanup`; Vercel automatically calls it with `Authorization: Bearer ${CRON_SECRET}`.
-
-`APP_BASE_URL` is also used for canonical URLs and social preview images, so set
-it to the public production origin before sharing links.
-
-## Notes
-
-- Password reset requires a working Resend configuration in production.
-- Bug reports are stored in Postgres first, so missing notification settings no longer block report submission.
-- File uploads are intentionally omitted to keep the app lightweight and easy to deploy.
+Roy McFarland — [brightline.io](https://brightline.io) · [roy@brightline.io](mailto:roy@brightline.io)
