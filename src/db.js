@@ -13,6 +13,14 @@ export class DatabaseNotConfiguredError extends Error {
 // across multiple instances will serialize on this lock so concurrent DDL
 // (during a deploy) can't deadlock on AccessExclusiveLock contention.
 const SCHEMA_LOCK_KEY = 7283749274n;
+const APPLICATION_TABLE_NAMES = Object.freeze([
+  "users",
+  "sessions",
+  "password_reset_tokens",
+  "bug_reports",
+  "admin_audit_log",
+]);
+const SAFE_IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/;
 
 const globalStore = globalThis.__bugReporterDbStore ?? {
   pool: null,
@@ -275,6 +283,29 @@ async function runMigrations(client) {
     CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx
     ON admin_audit_log(created_at DESC);
   `);
+
+  for (const statement of buildEnableRowLevelSecurityStatements()) {
+    await client.query(statement);
+  }
+}
+
+export function buildEnableRowLevelSecurityStatements(tableNames = APPLICATION_TABLE_NAMES) {
+  return tableNames.map(
+    (tableName) =>
+      `ALTER TABLE ${quoteQualifiedTableName("public", tableName)} ENABLE ROW LEVEL SECURITY;`,
+  );
+}
+
+function quoteQualifiedTableName(schemaName, tableName) {
+  return `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
+}
+
+function quoteIdentifier(identifier) {
+  if (!SAFE_IDENTIFIER_PATTERN.test(identifier)) {
+    throw new Error(`Unsafe SQL identifier: ${identifier}`);
+  }
+
+  return `"${identifier}"`;
 }
 
 function shouldUseSsl(connectionUrl) {

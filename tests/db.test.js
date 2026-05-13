@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createPoolOptions } from "../src/db.js";
+import { buildEnableRowLevelSecurityStatements, createPoolOptions } from "../src/db.js";
 
 test("createPoolOptions strips sslmode from remote pooled database URLs", () => {
   const options = createPoolOptions(
@@ -37,4 +37,21 @@ test("createPoolOptions enforces TLS verification when configured", () => {
 
   assert.equal(options.ssl.rejectUnauthorized, true);
   assert.equal(options.ssl.ca, "-----BEGIN CERTIFICATE-----");
+});
+
+test("buildEnableRowLevelSecurityStatements protects all app tables in public schema", () => {
+  assert.deepEqual(buildEnableRowLevelSecurityStatements(), [
+    'ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;',
+    'ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;',
+    'ALTER TABLE "public"."password_reset_tokens" ENABLE ROW LEVEL SECURITY;',
+    'ALTER TABLE "public"."bug_reports" ENABLE ROW LEVEL SECURITY;',
+    'ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;',
+  ]);
+});
+
+test("buildEnableRowLevelSecurityStatements rejects unsafe identifiers", () => {
+  assert.throws(
+    () => buildEnableRowLevelSecurityStatements(["users; DROP TABLE users"]),
+    /Unsafe SQL identifier/,
+  );
 });
