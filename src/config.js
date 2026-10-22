@@ -7,7 +7,7 @@ const DEFAULT_ADMIN_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_PASSWORD_MIN_LENGTH = 10;
-const DEFAULT_APP_NAME = "Beta Bug Reporter";
+const DEFAULT_APP_NAME = "Atlas Beta Bug Reporter";
 
 export function getConfig(env = process.env) {
   const environment = env.NODE_ENV?.trim() || "development";
