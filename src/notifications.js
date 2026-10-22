@@ -5,7 +5,7 @@ export class EmailDeliveryUnavailableError extends Error {
   }
 }
 
-const DEFAULT_APP_NAME = "Beta Bug Reporter";
+const DEFAULT_APP_NAME = "Atlas Beta Bug Reporter";
 
 export function createNotificationService(config, options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
