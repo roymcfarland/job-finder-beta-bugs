@@ -22,7 +22,7 @@
           where you left off.
         </p>
         <p class="hero-note">
-          Sign in with your tester account, or create one to start reporting.
+          Sign in with your tester account, or use an invite code to create one.
         </p>
         <p class="hero-note">
           This site is only for beta testers of Atlas (Jobfinder.guru), an AI job
@@ -83,7 +83,7 @@
         <section class="auth-panel hidden" data-panel="register">
           <h2>Create account</h2>
           <p class="panel-copy">
-            Create a tester account and you can start reporting right away.
+            An invite code from the Atlas beta team is required to create a tester account.
           </p>
 
           <form id="register-form" novalidate>
@@ -102,6 +102,12 @@
               />
               <small>Use at least 10 characters.</small>
               <p class="field-error" data-error-for="register-password"></p>
+            </label>
+
+            <label class="field">
+              <span>Invite code</span>
+              <input name="inviteCode" type="text" autocomplete="off" />
+              <p class="field-error" data-error-for="register-inviteCode"></p>
             </label>
 
             <button class="button-primary" type="submit">Create account</button>
