@@ -5,7 +5,9 @@ import { createAuthApi } from "../src/authApi.js";
 import {
   AccountDisabledError,
   AuthConfigurationError,
+  DuplicateEmailError,
   InvalidCredentialsError,
+  normalizeEmail,
 } from "../src/authService.js";
 import { getConfig } from "../src/config.js";
 
@@ -24,6 +26,151 @@ function createBlockingRateLimiter() {
     },
   };
 }
+
+function createRegistrationFixture({ env = {}, fieldErrors = {}, registerError } = {}) {
+  const registerCalls = [];
+  const api = createAuthApi({
+    config: getConfig({ NODE_ENV: "test", REGISTRATION_INVITE_CODE: "test-invite-code", ...env }),
+    rateLimiter: createAllowedRateLimiter(),
+    authService: {
+      normalizeEmail,
+      validateRegistrationInput() {
+        return fieldErrors;
+      },
+      async register(input) {
+        registerCalls.push(input);
+        if (registerError) {
+          throw registerError;
+        }
+        return {
+          user: { id: "user_1", email: input.email },
+          sessionToken: "session_token",
+          expiresAt: new Date("2026-04-25T00:00:00.000Z"),
+        };
+      },
+    },
+  });
+
+  return {
+    registerCalls,
+    register(payload = {}) {
+      return api.handle({
+        pathname: "/api/auth/register",
+        method: "POST",
+        ip: "127.0.0.1",
+        userAgent: "Mozilla/5.0",
+        contentType: "application/json",
+        rawBody: JSON.stringify({
+          email: "beta@example.com",
+          password: "long-enough-password",
+          ...payload,
+        }),
+      });
+    },
+  };
+}
+
+test("POST /api/auth/register accepts the correct invite code", async () => {
+  const fixture = createRegistrationFixture();
+  const result = await fixture.register({ inviteCode: "test-invite-code" });
+
+  assert.equal(result.status, 201);
+  assert.equal(fixture.registerCalls.length, 1);
+  assert.equal(fixture.registerCalls[0].email, "beta@example.com");
+  assert.match(result.headers["set-cookie"], /bug_reporter_session=session_token/);
+});
+
+test("POST /api/auth/register trims the supplied invite code", async () => {
+  const fixture = createRegistrationFixture();
+  const result = await fixture.register({ inviteCode: "  test-invite-code  " });
+
+  assert.equal(result.status, 201);
+  assert.equal(fixture.registerCalls.length, 1);
+});
+
+for (const [name, inviteCode] of [
+  ["missing code", undefined],
+  ["wrong code", "fake-invite-code"],
+  ["different-length code", "short"],
+  ["non-string code", 12345],
+  ["blank code", "   "],
+]) {
+  test(`POST /api/auth/register rejects ${name} without calling register`, async () => {
+    const fixture = createRegistrationFixture();
+    const result = await fixture.register({ inviteCode });
+
+    assert.equal(fixture.registerCalls.length, 0, "rejected attempts must not call register");
+    assert.equal(result.status, 403);
+    assert.deepEqual(JSON.parse(result.body), {
+      error: "A valid invite code is required to create an account.",
+      fieldErrors: { inviteCode: "That invite code isn't valid." },
+    });
+    assert.equal(result.headers["set-cookie"], undefined);
+  });
+}
+
+test("POST /api/auth/register lets a normalized admin email bypass the invite code", async () => {
+  const fixture = createRegistrationFixture({
+    env: { NODE_ENV: "production", ADMIN_EMAILS: "Admin@Example.com" },
+  });
+  const result = await fixture.register({ email: "  ADMIN@example.com  " });
+
+  assert.equal(result.status, 201);
+  assert.equal(fixture.registerCalls.length, 1);
+});
+
+test("POST /api/auth/register closes production registration with no code configured", async () => {
+  const fixture = createRegistrationFixture({
+    env: { NODE_ENV: "production", REGISTRATION_INVITE_CODE: "  " },
+  });
+  const result = await fixture.register({ inviteCode: "any-code" });
+
+  assert.equal(fixture.registerCalls.length, 0, "closed registration must not call register");
+  assert.equal(result.status, 403);
+  assert.deepEqual(JSON.parse(result.body), { error: "Registration is currently closed." });
+  assert.equal(result.headers["set-cookie"], undefined);
+});
+
+test("POST /api/auth/register lets an admin bootstrap when production registration is closed", async () => {
+  const fixture = createRegistrationFixture({
+    env: { NODE_ENV: "production", REGISTRATION_INVITE_CODE: "", ADMIN_EMAILS: "admin@example.com" },
+  });
+  const result = await fixture.register({ email: "admin@example.com" });
+
+  assert.equal(result.status, 201);
+  assert.equal(fixture.registerCalls.length, 1);
+});
+
+test("POST /api/auth/register stays open outside production with no code configured", async () => {
+  const fixture = createRegistrationFixture({
+    env: { NODE_ENV: "development", REGISTRATION_INVITE_CODE: "" },
+  });
+  const result = await fixture.register();
+
+  assert.equal(result.status, 201);
+  assert.equal(fixture.registerCalls.length, 1);
+});
+
+test("POST /api/auth/register validates fields before checking the invite code", async () => {
+  const fixture = createRegistrationFixture({ fieldErrors: { email: "Enter a valid email address." } });
+  const result = await fixture.register({ email: "invalid" });
+
+  assert.equal(fixture.registerCalls.length, 0);
+  assert.equal(result.status, 400);
+  assert.deepEqual(JSON.parse(result.body).fieldErrors, { email: "Enter a valid email address." });
+});
+
+test("POST /api/auth/register does not expose an existing account when the invite is missing", async () => {
+  const fixture = createRegistrationFixture({ registerError: new DuplicateEmailError() });
+  const result = await fixture.register();
+
+  assert.equal(fixture.registerCalls.length, 0);
+  assert.equal(result.status, 403);
+  assert.deepEqual(JSON.parse(result.body), {
+    error: "A valid invite code is required to create an account.",
+    fieldErrors: { inviteCode: "That invite code isn't valid." },
+  });
+});
 
 test("POST /api/auth/register creates a session cookie on success", async () => {
   const api = createAuthApi({

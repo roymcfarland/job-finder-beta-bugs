@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import {
   AccountDisabledError,
   AuthConfigurationError,
@@ -176,6 +178,11 @@ async function handleRegistration({ authService, config, headers, payload, reque
     );
   }
 
+  const registrationError = getRegistrationGateResponse({ authService, config, headers, payload });
+  if (registrationError) {
+    return registrationError;
+  }
+
   try {
     const result = await authService.register({
       email: payload.email,
@@ -212,6 +219,32 @@ async function handleRegistration({ authService, config, headers, payload, reque
 
     throw error;
   }
+}
+
+function getRegistrationGateResponse({ authService, config, headers, payload }) {
+  if (config.adminEmails.includes(authService.normalizeEmail(payload.email))) {
+    return null;
+  }
+
+  if (config.registrationInviteCode) {
+    const inviteCode = typeof payload.inviteCode === "string" ? payload.inviteCode.trim() : "";
+    // Hash both values so timingSafeEqual always receives equal-length buffers.
+    const hash = (value) => crypto.createHash("sha256").update(value, "utf8").digest();
+    if (!crypto.timingSafeEqual(hash(inviteCode), hash(config.registrationInviteCode))) {
+      return jsonResponse(
+        403,
+        {
+          error: "A valid invite code is required to create an account.",
+          fieldErrors: { inviteCode: "That invite code isn't valid." },
+        },
+        headers,
+      );
+    }
+  } else if (config.environment === "production") {
+    return jsonResponse(403, { error: "Registration is currently closed." }, headers);
+  }
+
+  return null;
 }
 
 async function handleLogin({
