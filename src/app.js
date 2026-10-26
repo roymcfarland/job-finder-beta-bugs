@@ -314,7 +314,7 @@ async function serveStaticAsset(pathname, method) {
       headers: {
         ...getSecurityHeaders(),
         "content-type": getMimeType(filePath),
-        "cache-control": "public, max-age=86400",
+        "cache-control": "public, max-age=0, must-revalidate",
       },
       body: method === "HEAD" ? null : fileContents,
     };
