@@ -45,6 +45,12 @@ The app serves four HTML pages: sign-in/registration, password reset, the tester
 
 This is the engineering decision the repo is meant to demonstrate: choose the smallest tool that handles the actual workload.
 
+## Security and caching notes
+
+- `vercel.json` sets a strict Content-Security-Policy (no inline scripts or styles), HSTS, `X-Frame-Options: DENY`, and related headers on every response.
+- On Vercel, files in `public/` are served by the platform with `max-age=0, must-revalidate` and an ETag, so deploys reach visitors immediately. `src/app.js` sends the same header when serving assets itself locally.
+- Registration is gated by a shared invite code from the environment, not by the admin dashboard; rotate it by changing `REGISTRATION_INVITE_CODE` and redeploying.
+
 ## Quick start
 
 ```bash
