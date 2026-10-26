@@ -334,10 +334,10 @@ function createUserCard(user) {
 function createCommentCard(comment) {
   const severity = variant(comment.severity, severityLevels, "medium");
   const body = element("div", { className: "comment-card__body" }, [
-    detailLine("What happened:", comment.happened),
-    detailLine("How to reproduce:", comment.reproduceSteps),
-    comment.expectedBehavior ? detailLine("Expected:", comment.expectedBehavior) : null,
-    comment.extraDetails ? detailLine("Extra details:", comment.extraDetails) : null,
+    detailLine("What happened", comment.happened),
+    detailLine("How to reproduce", comment.reproduceSteps),
+    comment.expectedBehavior ? detailLine("Expected", comment.expectedBehavior) : null,
+    comment.extraDetails ? detailLine("Extra details", comment.extraDetails) : null,
     createAffectedUrlLine(comment.affectedUrl),
   ]);
 
@@ -396,7 +396,7 @@ function createAffectedUrlLine(url) {
   }
 
   const paragraph = element("p");
-  paragraph.append(element("strong", { text: "Affected URL:" }), " ");
+  paragraph.append(element("strong", { text: "Affected URL" }), " ");
 
   if (isSafeHttpUrl(url)) {
     paragraph.append(
