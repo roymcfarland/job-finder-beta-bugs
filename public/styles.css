@@ -433,6 +433,10 @@ select:focus {
   box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.08);
 }
 
+.field-error:empty {
+  display: none;
+}
+
 .field-error {
   min-height: 1.2rem;
   margin: 0;
@@ -736,6 +740,29 @@ select:focus {
 
 .comment-card__body p {
   line-height: 1.65;
+}
+
+.comment-card__body p strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.comment-card__head > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-user-card__head .button-secondary,
+.comment-card__head .button-secondary {
+  min-width: 5.5rem;
+  flex-shrink: 0;
+  text-align: center;
 }
 
 .field--compact {
