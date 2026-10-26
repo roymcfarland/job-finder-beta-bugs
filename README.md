@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Live](https://img.shields.io/badge/live-brightlinebugs.com-brightgreen)](https://brightlinebugs.com)
 
+> **Not affiliated with Brightline, the Florida train service.** This is the bug reporter for Atlas (Jobfinder.guru) beta testers only. It cannot take reports about train tickets, bookings, or Brightline's app.
+
 ## What this is
 
 This is the public infrastructure half of a deliberate pattern: ship the product private, ship the infrastructure around it public.
@@ -21,6 +23,7 @@ The interesting choice in this repo is what it doesn't have: no React, no Next.j
 - Structured bug submission with severity, category, reproduction steps, and affected URL
 - Vercel Cron cleanup of expired sessions and expired or used password reset tokens
 - Resend-backed password reset emails and optional report notifications by email or webhook
+- Row Level Security enabled on all application tables when the schema is created or migrated
 - Postgres-backed `admin_audit_log` for admin actions: enabling/disabling users and resolving/reopening reports
 - Plain HTML templates — no client-side framework, no build step for the UI
 
