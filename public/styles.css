@@ -829,7 +829,6 @@ button.text-link:hover {
 
   .dashboard-header,
   .session-cta,
-  .admin-user-card__head,
   .comment-card__head,
   .panel-header,
   .filter-row,
@@ -840,7 +839,51 @@ button.text-link:hover {
   }
 
   h1 {
-    max-width: 9ch;
+    max-width: 11ch;
+    font-size: 2.3rem;
+  }
+
+  .hero--landing {
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .lede {
+    margin-top: 0.8rem;
+    font-size: 1rem;
+  }
+
+  .hero-note {
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .admin-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-user-card__head > div:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-user-card__head {
+    gap: 0.6rem;
+  }
+
+  .admin-user-card__head strong {
+    font-size: 0.9rem;
+  }
+
+  .admin-user-card__head .button-secondary {
+    min-width: 4.5rem;
+    padding-inline: 0.7rem;
+  }
+
+  .admin-user-card small {
+    display: block;
+    margin-top: 0.5rem;
   }
 
   .panel {
