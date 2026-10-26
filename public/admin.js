@@ -108,7 +108,7 @@ async function loadComments() {
     response = await fetch(`/api/admin/comments?${searchParams.toString()}`);
     data = await response.json().catch(() => ({}));
   } catch {
-    showStatus("Network error while loading comments.", "error");
+    showStatus("Network error while loading reports.", "error");
     return;
   }
 
@@ -117,7 +117,7 @@ async function loadComments() {
   }
 
   if (!response.ok) {
-    showStatus(data.error || "Failed to load comments.", "error");
+    showStatus(data.error || "Failed to load reports.", "error");
     return;
   }
 
@@ -203,19 +203,19 @@ async function handleCommentAction(event) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      showStatus(data.error || "Failed to update comment status.", "error");
+      showStatus(data.error || "Failed to update report status.", "error");
       return;
     }
 
     showStatus(
-      `Comment ${data.comment.isResolved ? "resolved" : "reopened"} successfully.`,
+      `Report ${data.comment.isResolved ? "resolved" : "reopened"} successfully.`,
       "success",
     );
 
     await loadDashboard();
     await loadComments();
   } catch {
-    showStatus("Network error while updating the comment.", "error");
+    showStatus("Network error while updating the report.", "error");
   } finally {
     button.disabled = false;
   }
@@ -262,7 +262,7 @@ function renderUserFilter(userList) {
 function renderComments(comments) {
   if (!comments.length) {
     commentsContainer.className = "admin-comment-list empty-state";
-    commentsContainer.textContent = "No comments match these filters.";
+    commentsContainer.textContent = "No reports match these filters.";
     return;
   }
 
@@ -324,7 +324,7 @@ function createUserCard(user) {
       element("small", {
         text: [
           `${user.unresolvedCommentCount} unresolved`,
-          `${user.totalCommentCount} total comments`,
+          `${user.totalCommentCount} total reports`,
         ].join(" / "),
       }),
     ],
