@@ -16,7 +16,11 @@ concurrency:
 
 jobs:
   test:
-    name: Node tests
+    name: Node tests (Node ${{ matrix.node-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,11 +31,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run tests
         run: npm test
