@@ -31,7 +31,7 @@ The interesting choice in this repo is what it doesn't have: no React, no Next.j
 
 | Component | Technology |
 |---|---|
-| Runtime | Node.js 20+ |
+| Runtime | Node.js 22+ required, 24 recommended |
 | Database | Postgres |
 | Email | [Resend](https://resend.com) |
 | Cron | [Vercel Cron](https://vercel.com/docs/cron-jobs) |
