@@ -64,11 +64,62 @@ npm run dev
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Set `ADMIN_EMAILS` to the email addresses that should receive admin access. Set `RESEND_API_KEY` and `EMAIL_FROM` for password reset email delivery; without them, development logs the reset link locally.
 
+Use a comma-separated list for `ADMIN_EMAILS`. With a nonempty list, roles are synchronized at login and session refresh. An empty list leaves existing roles as stored.
+
 Set `REGISTRATION_INVITE_CODE` to a shared code distributed by the Atlas beta team. Generate one with `openssl rand -hex 16`. Non-admin registration requires that code whenever it is configured. If it is unset or blank, registration stays open outside production and is closed in production. Emails listed in `ADMIN_EMAILS` can register without a code, including when production registration is closed. Existing users can still log in.
 
 For production, set `REGISTRATION_INVITE_CODE`, configure the database and email variables, and set `CRON_SECRET` to protect `/api/cron/cleanup`. That is the only scheduled job in `vercel.json`; it runs daily at 03:17 UTC and deletes expired sessions plus expired reset tokens or tokens used more than seven days ago. See `.env.example` for configuration options.
 
 Run `npm test` for the full test suite, as CI does. Run `npm run cleanup` for manual session and reset-token cleanup.
+
+## Continuous integration and dependencies
+
+[CI](.github/workflows/ci.yml) runs on pushes to `main`, on pull requests, and on manual dispatch. The test matrix runs Node.js 22 and 24 on `ubuntu-latest`, with a 10-minute timeout per job and `fail-fast: false`. Each job runs `npm ci`, then `npm audit --omit=dev --audit-level=high`, then `npm test`. High or critical production dependency advisories fail the audit step and the job.
+
+The [Stack](#stack) lists the supported Node.js versions. [`package.json`](package.json) sets `engines.node` to `>=22`, and [`.nvmrc`](.nvmrc) pins Node.js 24 for local development. [Dependabot](.github/dependabot.yml) opens monthly grouped update PRs for npm and GitHub Actions, with up to three open PRs per ecosystem.
+
+Scheduled GitHub Actions triggers are intentionally disallowed. [`tests/githubActionsPolicy.test.js`](tests/githubActionsPolicy.test.js) fails if a workflow adds a `schedule:` or `cron:` key. The [Vercel Cron cleanup job](vercel.json) is the repo's only scheduled job.
+
+## Additional environment variables
+
+These settings supplement the variables in [Quick start](#quick-start).
+
+| Variable | Purpose |
+|---|---|
+| `ADMIN_RATE_LIMIT_MAX` | Maximum admin API requests per IP within the admin rate limit window. |
+| `ADMIN_RATE_LIMIT_WINDOW_MS` | Admin API rate limit window in milliseconds. |
+| `ALLOWED_ORIGIN` | Origin allowed for credentialed API requests and accepted by the auth origin check. |
+| `APP_BASE_URL` | Explicit public base URL used for password reset links, social metadata, and auth origin checks. |
+| `APP_NAME` | Display name used in email and social metadata. |
+| `AUTH_FROM_EMAIL` | Preferred Resend sender address, ahead of `EMAIL_FROM`. |
+| `AUTH_RATE_LIMIT_MAX` | Maximum rate-limited authentication requests per IP within the auth rate limit window. It also sets the basis for the per-account login limit. |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | Auth rate limit window in milliseconds for both IP and per-account limits. |
+| `BUG_REPORT_FROM_EMAIL` | Resend sender fallback after `AUTH_FROM_EMAIL` and `EMAIL_FROM`. |
+| `BUG_REPORT_NOTIFICATION_TO_EMAIL` | Recipient address for bug report notification emails. |
+| `BUG_REPORT_TO_EMAIL` | Fallback recipient address for bug report notification emails. |
+| `DATABASE_SSL_CA` | CA certificate supplied for remote Postgres TLS connections. |
+| `DATABASE_SSL_REJECT_UNAUTHORIZED` | Controls certificate verification for remote Postgres TLS connections. |
+| `HOST` | Server bind address and host for the base URL fallback. |
+| `NODE_ENV` | Application environment. Production mode changes registration, cookie, and email behavior. |
+| `PASSWORD_MIN_LENGTH` | Minimum accepted password length. |
+| `PASSWORD_RESET_TTL_MS` | Password reset token lifetime in milliseconds. |
+| `PORT` | Server listen port and port for the base URL fallback. |
+| `POSTGRES_URL` | First Postgres connection URL fallback after `DATABASE_URL`. |
+| `POSTGRES_PRISMA_URL` | Postgres connection URL fallback after `POSTGRES_URL`. |
+| `POSTGRES_URL_NON_POOLING` | Postgres connection URL fallback after `POSTGRES_PRISMA_URL`. |
+| `PUBLIC_VERCEL_URL` | First public URL fallback when `APP_BASE_URL` is unset. |
+| `RATE_LIMIT_MAX` | Maximum bug report submission requests per IP within the report rate limit window. |
+| `RATE_LIMIT_WINDOW_MS` | Bug report submission rate limit window in milliseconds. |
+| `REPORT_WEBHOOK_TOKEN` | Optional bearer token sent to the bug report notification webhook. |
+| `REPORT_WEBHOOK_URL` | Destination for bug report notifications. When configured, the webhook takes precedence over email. |
+| `SESSION_COOKIE_NAME` | Overrides the default session cookie name. |
+| `SESSION_COOKIE_SECURE` | Controls the Secure flag on session cookies in production. It defaults to enabled. |
+| `SESSION_TTL_MS` | Session lifetime in milliseconds. |
+| `TRUST_PROXY` | Controls whether client IP detection trusts proxy headers. It defaults to enabled when Vercel is detected. |
+| `VERCEL` | Platform marker used to detect Vercel for the default proxy trust setting. |
+| `VERCEL_ENV` | Platform environment marker also used to detect Vercel for the default proxy trust setting. |
+| `VERCEL_PROJECT_PRODUCTION_URL` | Public URL fallback after `PUBLIC_VERCEL_URL`. Its presence also signals Vercel. |
+| `VERCEL_URL` | Public URL fallback after `VERCEL_PROJECT_PRODUCTION_URL`. Its presence also signals Vercel. |
 
 ## Project structure
 
@@ -76,9 +127,11 @@ Run `npm test` for the full test suite, as CI does. Run `npm run cleanup` for ma
 .
 ├── .env.example
 ├── .github/
+│   ├── dependabot.yml
 │   └── workflows/
 │       └── ci.yml
 ├── .gitignore
+├── .nvmrc
 ├── LICENSE
 ├── README.md
 ├── package-lock.json
