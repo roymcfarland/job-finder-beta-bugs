@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Lightweight bug-report inbox for authenticated beta users.",
   "engines": {
-    "node": ">=22"
+    "node": "24.x"
   },
   "dependencies": {
     "pg": "^8.23.1"
