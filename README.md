@@ -31,7 +31,7 @@ The interesting choice in this repo is what it doesn't have: no React, no Next.j
 
 | Component | Technology |
 |---|---|
-| Runtime | Node.js 22+ required, 24 recommended |
+| Runtime | Node.js 24 required |
 | Database | Postgres |
 | Email | [Resend](https://resend.com) |
 | Cron | [Vercel Cron](https://vercel.com/docs/cron-jobs) |
@@ -74,9 +74,9 @@ Run `npm test` for the full test suite, as CI does. Run `npm run cleanup` for ma
 
 ## Continuous integration and dependencies
 
-[CI](.github/workflows/ci.yml) runs on pushes to `main`, on pull requests, and on manual dispatch. The test matrix runs Node.js 22 and 24 on `ubuntu-latest`, with a 10-minute timeout per job and `fail-fast: false`. Each job runs `npm ci`, then `npm audit --omit=dev --audit-level=high`, then `npm test`. High or critical production dependency advisories fail the audit step and the job.
+[CI](.github/workflows/ci.yml) runs on pushes to `main`, on pull requests, and on manual dispatch. The test matrix runs Node.js 24 on `ubuntu-latest`, with a 10-minute timeout per job and `fail-fast: false`. Each job runs `npm ci`, then `npm audit --omit=dev --audit-level=high`, then `npm test`. High or critical production dependency advisories fail the audit step and the job.
 
-The [Stack](#stack) lists the supported Node.js versions. [`package.json`](package.json) sets `engines.node` to `>=22`, and [`.nvmrc`](.nvmrc) pins Node.js 24 for local development. [Dependabot](.github/dependabot.yml) opens monthly grouped update PRs for npm and GitHub Actions, with up to three open PRs per ecosystem.
+[`package.json`](package.json) requires Node.js 24 via `engines.node` set to `24.x`, and [`.nvmrc`](.nvmrc) pins Node.js 24 for local development. [Dependabot](.github/dependabot.yml) opens monthly grouped update PRs for npm and GitHub Actions, with up to three open PRs per ecosystem.
 
 Scheduled GitHub Actions triggers are intentionally disallowed. [`tests/githubActionsPolicy.test.js`](tests/githubActionsPolicy.test.js) fails if a workflow adds a `schedule:` or `cron:` key. The [Vercel Cron cleanup job](vercel.json) is the repo's only scheduled job.
 
