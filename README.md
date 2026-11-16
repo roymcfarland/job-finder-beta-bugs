@@ -128,7 +128,7 @@ For production, configure the database and email settings, set `REGISTRATION_INV
 ## Security and automation
 
 - [`vercel.json`](vercel.json) sets security headers across Vercel routes, including a Content Security Policy that blocks inline scripts and styles, HSTS, and `X-Frame-Options: DENY`.
-- [`src/app.js`](src/app.js) serves local assets with `max-age=0, must-revalidate`. The expected Vercel policy for `public/` assets is the same cache header with an ETag. Verify those headers against the deployed assets.
+- As verified on 2026-11-16, Vercel serves static assets in `public/` with `cache-control: public, max-age=0, must-revalidate` and an ETag, so caches revalidate before reusing an asset on each request. Vercel serves HTML pages with `cache-control: no-store`. [`src/app.js`](src/app.js) sends the same cache-control header for assets it serves locally.
 - [CI](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. The test matrix uses the Node major in Quick start on `ubuntu-latest`, with a 10-minute timeout and `fail-fast: false`. It runs `npm ci`, `npm audit --omit=dev --audit-level=high`, and `npm test`. High or critical production dependency advisories fail the audit and the job. Branch protection requires the Node test check and an up-to-date PR branch before merging.
 - [Dependabot](.github/dependabot.yml) groups npm and GitHub Actions updates monthly, with up to three open update PRs per ecosystem.
 - [The workflow policy test](tests/githubActionsPolicy.test.js) disallows scheduled Actions triggers using the `schedule` or `cron` keys. Vercel Cron handles the application's scheduled cleanup.
